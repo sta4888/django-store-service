@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  # PostgreSQL база данных
+  postgres:
+    image: postgres:16-alpine
+    container_name: django_store_postgres
+    env_file:
+      - .env
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql  # если нужны начальные данные
+    networks:
+      - django_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # pgAdmin для управления БД
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: django_store_pgadmin
+    env_file:
+      - .env
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - django_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Django приложение (опционально, для продакшена)
+  # web:
+  #   build: .
+  #   command: python manage.py runserver 0.0.0.0:8000
+  #   volumes:
+  #     - ./src:/app/src
+  #   ports:
+  #     - "8000:8000"
+  #   environment:
+  #     - DEBUG=True
+  #     - DATABASE_URL=postgres://postgres:postgres123@postgres:5432/myproject
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   networks:
+  #     - django_network
+
+volumes:
+  postgres_data:
+  pgadmin_data:
+
+networks:
+  django_network:
+    driver: bridge

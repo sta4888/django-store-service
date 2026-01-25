@@ -1,0 +1,31 @@
+{% extends 'catalog/base.html' %}
+
+{% block title %}Каталог товаров{% endblock %}
+
+{% block content %}
+<h1>Каталог товаров</h1>
+
+<h2>Категории</h2>
+<ul>
+    {% for category in categories %}
+        <li>
+            <a href="{{ category.get_absolute_url }}">{{ category.name }}</a>
+        </li>
+    {% endfor %}
+</ul>
+
+<h2>Товары</h2>
+<div class="row">
+    {% for product in products %}
+        <div class="col-md-3 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">{{ product.name }}</h5>
+                    <p class="card-text">{{ product.price }} руб.</p>
+                    <a href="{{ product.get_absolute_url }}" class="btn btn-primary">Подробнее</a>
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}
