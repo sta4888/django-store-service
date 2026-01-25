@@ -32,7 +32,7 @@ ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 MY_INSTALLED_APPS = [
 
     # Сторонние приложения
-    # 'mptt',
+    'mptt',
     # 'django_filters',
     # 'crispy_forms',
     # 'crispy_bootstrap5',

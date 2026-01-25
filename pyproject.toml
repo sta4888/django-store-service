@@ -10,7 +10,8 @@ dependencies = [
     "psycopg2-binary>=2.9.9",  # Для PostgreSQL
     "Pillow>=10.0.0",
     "django-extensions>=3.2.0",
-
+    "faker>=40.1.2",
+    "django-mptt>=0.18.0",
 ]
 
 [dependency-groups]

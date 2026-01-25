@@ -6,26 +6,53 @@
 <h1>Каталог товаров</h1>
 
 <h2>Категории</h2>
-<ul>
+<ul class="list-group mb-4">
     {% for category in categories %}
-        <li>
+        <li class="list-group-item">
             <a href="{{ category.get_absolute_url }}">{{ category.name }}</a>
+            <span class="badge bg-secondary float-end">{{ category.products.count }}</span>
         </li>
+    {% empty %}
+        <li class="list-group-item">Категорий пока нет</li>
     {% endfor %}
 </ul>
 
 <h2>Товары</h2>
-<div class="row">
-    {% for product in products %}
-        <div class="col-md-3 mb-4">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">{{ product.name }}</h5>
-                    <p class="card-text">{{ product.price }} руб.</p>
-                    <a href="{{ product.get_absolute_url }}" class="btn btn-primary">Подробнее</a>
+
+{% if products %}
+    <div class="row">
+        {% for product in products %}
+            <div class="col-md-3 mb-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ product.name }}</h5>
+                        <p class="card-text">
+                            {% if product.has_discount %}
+                                <s class="text-muted">{{ product.old_price }} руб.</s><br>
+                                <strong class="text-danger">{{ product.price }} руб.</strong>
+                                <span class="badge bg-success">-{{ product.discount_percent }}%</span>
+                            {% else %}
+                                <strong>{{ product.price }} руб.</strong>
+                            {% endif %}
+                        </p>
+                        <p class="card-text">
+                            <small class="text-muted">
+                                {{ product.category.name }}<br>
+                                {{ product.in_stock|yesno:"В наличии,Нет в наличии" }}
+                            </small>
+                        </p>
+                        <a href="{{ product.get_absolute_url }}" class="btn btn-primary">Подробнее</a>
+                    </div>
                 </div>
             </div>
-        </div>
-    {% endfor %}
-</div>
+        {% endfor %}
+    </div>
+
+    <!-- Пагинация -->
+    {% include 'catalog/includes/pagination.html' %}
+{% else %}
+    <div class="alert alert-info">
+        Товаров пока нет. Загляните позже!
+    </div>
+{% endif %}
 {% endblock %}
