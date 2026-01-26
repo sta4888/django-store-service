@@ -50,10 +50,25 @@ class Command(BaseCommand):
 
         if clear_existing:
             self.stdout.write('Очистка существующих данных...')
+
+            # Сначала удаляем товары (без каскадного удаления связей)
             Product.objects.all().delete()
+
+            # Затем значения атрибутов и атрибуты
             AttributeValue.objects.all().delete()
             Attribute.objects.all().delete()
+
+            # Удаляем категории (MPTT автоматически перестроит дерево)
             Category.objects.all().delete()
+
+            # Очищаем таблицу связей ManyToMany если она существует
+            from django.db import connection
+            with connection.cursor() as cursor:
+                try:
+                    cursor.execute("DELETE FROM catalog_product_attributes")
+                    self.stdout.write('Очищена таблица связей товаров с атрибутами')
+                except Exception:
+                    self.stdout.write('Таблица связей товаров с атрибутами не существует')
 
         # 1. Создаём атрибуты (всё равно создаём для будущего использования)
         self.stdout.write('Создание атрибутов...')
@@ -130,8 +145,7 @@ class Command(BaseCommand):
                 slug=f'category-root-{i}',
                 defaults={
                     'name': name,
-                    'parent': None,
-                    'is_root': True,
+                    'parent': None,  # parent=None автоматически делает категорию корневой
                     'description': fake.text(max_nb_chars=200),
                 }
             )
@@ -143,7 +157,7 @@ class Command(BaseCommand):
         for root_cat in root_categories:
             # 3-5 подкатегорий для каждой корневой
             for j in range(random.randint(3, 5)):
-                cat_name = f'{root_cat.name} - {fake.word().capitalize()}'
+                cat_name = f'{fake.word().capitalize()}'
                 slug = f'{root_cat.slug}-sub-{j}'
 
                 cat, created = Category.objects.get_or_create(
@@ -159,7 +173,7 @@ class Command(BaseCommand):
                 # Вложенные подкатегории (уровень 3)
                 if random.choice([True, False]):  # 50% chance
                     for k in range(random.randint(2, 4)):
-                        sub_cat_name = f'{cat_name} - {fake.word().capitalize()}'
+                        sub_cat_name = f'{fake.word().capitalize()}'
                         sub_slug = f'{slug}-deep-{k}'
 
                         sub_cat, created = Category.objects.get_or_create(

@@ -1,0 +1,67 @@
+<!-- Верхняя панель фильтров (сортировка и количество) -->
+<div class="row mb-3 align-items-center">
+    <div class="col-md-6">
+        <div class="d-flex align-items-center">
+            <span class="me-2">Сортировка:</span>
+            <form method="get" class="d-inline">
+                <!-- Сохраняем другие параметры фильтрации -->
+                {% for key, value in request.GET.items %}
+                    {% if key != 'sort_by' and key != 'page' %}
+                        <input type="hidden" name="{{ key }}" value="{{ value }}">
+                    {% endif %}
+                {% endfor %}
+
+                <select name="sort_by" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
+                    {% for value, label in filter_form.fields.sort_by.choices %}
+                        <option value="{{ value }}"
+                                {% if filter_form.sort_by.value == value %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </form>
+        </div>
+    </div>
+    <div class="col-md-6 text-md-end">
+        <div class="d-flex align-items-center justify-content-md-end">
+            <span class="me-2">На странице:</span>
+            <form method="get" class="d-inline">
+                <!-- Сохраняем другие параметры -->
+                {% for key, value in request.GET.items %}
+                    {% if key != 'page_size' and key != 'page' %}
+                        <input type="hidden" name="{{ key }}" value="{{ value }}">
+                    {% endif %}
+                {% endfor %}
+
+                <select name="page_size" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
+                    <option value="12" {% if page_size == 12 %}selected{% endif %}>12</option>
+                    <option value="24" {% if page_size == 24 %}selected{% endif %}>24</option>
+                    <option value="48" {% if page_size == 48 %}selected{% endif %}>48</option>
+                </select>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Информация о результатах -->
+<div class="alert alert-light py-2 mb-3">
+    <div class="row align-items-center">
+        <div class="col-md-8">
+            <small>
+                Найдено товаров: <strong>{{ paginator.count }}</strong>
+                {% if filter_form.is_bound %}
+                    <span class="ms-2">
+                        <a href="?" class="text-decoration-none">
+                            <i class="bi bi-x-circle"></i> Сбросить фильтры
+                        </a>
+                    </span>
+                {% endif %}
+            </small>
+        </div>
+        <div class="col-md-4 text-md-end">
+            <small>
+                Страница {{ products.number }} из {{ paginator.num_pages }}
+            </small>
+        </div>
+    </div>
+</div>

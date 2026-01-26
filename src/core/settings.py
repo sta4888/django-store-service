@@ -133,12 +133,14 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATICFILES_DIRS = [
+    BASE_DIR / 'static',
+]
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_DIRS = [BASE_DIR / 'static']
 
-# Media files
-MEDIA_URL = 'media/'
+# Медиа файлы
+MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 # Crispy Forms
@@ -157,3 +159,11 @@ SITE_URL = os.getenv('SITE_URL', 'http://localhost:8000')
 TEST_RUNNER = 'django.test.runner.DiscoverRunner'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+ITEMS_PER_PAGE = 12
+
+
+LOGIN_URL = 'users:login'  # Путь к странице входа
+LOGIN_REDIRECT_URL = 'users:profile'  # Куда перенаправлять после входа
+LOGOUT_REDIRECT_URL = 'catalog:index'  # Куда перенаправлять после выхода

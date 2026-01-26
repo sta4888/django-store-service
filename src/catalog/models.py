@@ -3,10 +3,11 @@ from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 from django.utils.text import slugify
 from django.core.exceptions import ValidationError
+from mptt.models import MPTTModel, TreeForeignKey  # Импортируем MPTT
 
 
-class Category(models.Model):
-    """Модель категорий товаров"""
+class Category(MPTTModel):  # Наследуемся от MPTTModel
+    """Модель категорий товаров с древовидной структурой"""
 
     name = models.CharField(
         _('Name'),
@@ -22,7 +23,8 @@ class Category(models.Model):
         blank=True
     )
 
-    parent = models.ForeignKey(
+    # Заменяем parent на TreeForeignKey для MPTT
+    parent = TreeForeignKey(
         'self',
         on_delete=models.CASCADE,
         null=True,
@@ -41,12 +43,6 @@ class Category(models.Model):
         default=True
     )
 
-    is_root = models.BooleanField(
-        _('Is root category'),
-        default=False,
-        help_text=_('Root category for breadcrumbs')
-    )
-
     created_at = models.DateTimeField(
         _('Created at'),
         auto_now_add=True
@@ -57,26 +53,32 @@ class Category(models.Model):
         auto_now=True
     )
 
+    # MPTT-specific fields (автоматически добавляются)
+    # lft, rght, tree_id, level
+
+    class MPTTMeta:
+        order_insertion_by = ['name']
+        verbose_name = _('Category')
+        verbose_name_plural = _('Categories')
+
     class Meta:
         verbose_name = _('Category')
         verbose_name_plural = _('Categories')
-        ordering = ['name']
         indexes = [
             models.Index(fields=['slug']),
             models.Index(fields=['is_active']),
         ]
 
     def __str__(self):
-        return self.name
+        # Показываем отступы для вложенности
+        return f"{'--' * self.level} {self.name}"
 
     def save(self, *args, **kwargs):
         """Переопределяем save для генерации slug"""
-        # Генерируем slug если он пустой
         if not self.slug or self.slug.strip() == '':
             base_slug = slugify(self.name)
             slug = base_slug
 
-            # Проверяем уникальность slug
             counter = 1
             while Category.objects.filter(slug=slug).exists():
                 slug = f"{base_slug}-{counter}"
@@ -86,42 +88,61 @@ class Category(models.Model):
 
         super().save(*args, **kwargs)
 
-    # Удаляем метод get_level или заменяем на свой
-    def get_level(self):
-        """Получение уровня вложенности (упрощённо)"""
-        level = 0
-        parent = self.parent
-        while parent:
-            level += 1
-            parent = parent.parent
-        return level
-
     def get_absolute_url(self):
         return reverse('catalog:category_detail', args=[self.slug])
 
     def get_breadcrumbs(self):
-        """Получение хлебных крошек для категории"""
-        from django.urls import reverse
-
+        """Получение хлебных крошек для категории через MPTT"""
         breadcrumbs = []
-        current = self
 
-        # Поднимаемся вверх по иерархии
-        while current:
-            breadcrumbs.insert(0, {
-                'name': current.name,
-                'url': current.get_absolute_url()
-            })
-            current = current.parent
+        # Используем get_ancestors из MPTT
+        ancestors = self.get_ancestors(include_self=True)
 
-        # Добавляем главную страницу каталога если нужно
-        if not breadcrumbs or breadcrumbs[0]['name'] != 'Каталог':
-            breadcrumbs.insert(0, {
-                'name': 'Каталог',
-                'url': reverse('catalog:index')
+        for ancestor in ancestors:
+            breadcrumbs.append({
+                'name': ancestor.name,
+                'url': ancestor.get_absolute_url()
             })
 
         return breadcrumbs
+
+    def get_descendants_products(self):
+        """Получить все товары из этой категории и всех её подкатегорий"""
+        from django.db.models import Q
+
+        # Получаем всех потомков (включая саму категорию)
+        descendants = self.get_descendants(include_self=True)
+
+        # Получаем все товары из всех потомков
+        products = Product.objects.filter(category__in=descendants)
+        return products
+
+    def get_active_children(self):
+        """Получить активные дочерние категории"""
+        return self.children.filter(is_active=True)
+
+    def get_all_products_count(self):
+        """Получить количество всех товаров в категории и подкатегориях"""
+        return self.get_descendants_products().count()
+
+    def get_direct_products_count(self):
+        """Получить количество товаров только в этой категории"""
+        return self.products.count()
+
+    def get_tree_path(self):
+        """Получить путь в виде строки: Родитель > Ребенок > Внук"""
+        ancestors = self.get_ancestors(include_self=True)
+        return ' > '.join([ancestor.name for ancestor in ancestors])
+
+    @property
+    def is_root(self):
+        """Является ли категория корневой (уровень 0)"""
+        return self.level == 0
+
+    @property
+    def has_children(self):
+        """Есть ли у категории дети"""
+        return self.children.exists()
 
 
 class ActiveProductManager(models.Manager):
@@ -354,10 +375,9 @@ class Product(models.Model):
 
     def get_breadcrumbs(self):
         """Получение хлебных крошек для товара"""
-        # Получаем хлебные крошки категории
-        breadcrumbs = self.category.get_breadcrumbs()
+        breadcrumbs = self.category.get_breadcrumbs()  # Используем метод категории
 
-        # Добавляем товар
+        # Добавляем сам товар
         breadcrumbs.append({
             'name': self.name,
             'url': self.get_absolute_url()

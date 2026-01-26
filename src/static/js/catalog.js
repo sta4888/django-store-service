@@ -1,0 +1,250 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Каталог товаров | EVERON{% endblock %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="{% static 'css/catalog.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <!-- Хлебные крошки -->
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb breadcrumb-custom">
+            <li class="breadcrumb-item"><a href="/"><i class="fas fa-home me-1"></i> Главная</a></li>
+            <li class="breadcrumb-item active">Каталог</li>
+        </ol>
+    </nav>
+    
+    <!-- Баннер акции -->
+    <div class="promo-banner mb-4">
+        <div class="promo-content">
+            <h2 class="promo-title">Скидка 25% на все витамины!</h2>
+            <p class="promo-subtitle">Только до конца месяца специальные цены для укрепления иммунитета. Успейте купить!</p>
+            <button class="btn" style="background: white; color: var(--color-red); font-weight: 600;">
+                <i class="fas fa-bolt me-2"></i>Смотреть акционные товары
+            </button>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Левая колонка - фильтры -->
+        <div class="col-lg-3 mb-4">
+            {% include 'catalog/includes/filters_sidebar.html' %}
+
+            <!-- Дерево категорий -->
+            <div class="filter-sidebar">
+                <div class="filter-header">
+                    <h3 class="filter-title">Категории</h3>
+                </div>
+                <div class="filter-section">
+                    <ul class="filter-options">
+                        {% for category in categories %}
+                        <li class="filter-option">
+                            <label>
+                                <input type="checkbox" name="category" value="{{ category.slug }}"
+                                       {% if category.slug in request.GET.category %}checked{% endif %}
+                                       onchange="applyFilters()">
+                                {{ category.name }}
+                                <span class="filter-count">({{ category.products.count }})</span>
+                            </label>
+                        </li>
+                        {% empty %}
+                        <li class="filter-option">Категорий пока нет</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Правая колонка - товары -->
+        <div class="col-lg-9">
+            <!-- Сортировка -->
+            <div class="sorting-header">
+                <div class="sorting-options">
+                    <span class="sorting-label">Сортировать:</span>
+                    <select class="sorting-select" onchange="changeSorting(this.value)">
+                        <option value="popular" {% if request.GET.sort == 'popular' %}selected{% endif %}>По популярности</option>
+                        <option value="price-asc" {% if request.GET.sort == 'price-asc' %}selected{% endif %}>По возрастанию цены</option>
+                        <option value="price-desc" {% if request.GET.sort == 'price-desc' %}selected{% endif %}>По убыванию цены</option>
+                        <option value="rating" {% if request.GET.sort == 'rating' %}selected{% endif %}>По рейтингу</option>
+                        <option value="new" {% if request.GET.sort == 'new' %}selected{% endif %}>По новизне</option>
+                    </select>
+                    <span class="sorting-label d-none d-md-inline">Товаров:</span>
+                    <span class="badge bg-gradient">{{ products|length }}</span>
+                </div>
+                
+                <div class="view-options">
+                    <button class="view-btn active" data-view="grid" onclick="changeView('grid')">
+                        <i class="fas fa-th"></i>
+                    </button>
+                    <button class="view-btn" data-view="list" onclick="changeView('list')">
+                        <i class="fas fa-list"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Категории (плитки) -->
+            <div class="categories-section mb-4">
+                <h3 class="mb-4">Категории продукции</h3>
+                <div class="categories-grid">
+                    {% for category in categories|slice:":4" %}
+                    <a href="?category={{ category.slug }}" class="category-card">
+                        <div class="category-icon">
+                            <i class="fas 
+                                {% if 'витамин' in category.name|lower %}fa-capsules
+                                {% elif 'минерал' in category.name|lower %}fa-tablets
+                                {% elif 'мозг' in category.name|lower or 'память' in category.name|lower %}fa-brain
+                                {% elif 'сердце' in category.name|lower %}fa-heart
+                                {% elif 'иммунитет' in category.name|lower %}fa-shield-alt
+                                {% elif 'похуден' in category.name|lower %}fa-weight
+                                {% else %}fa-pills{% endif %}">
+                            </i>
+                        </div>
+                        <h4 class="category-title">{{ category.name }}</h4>
+                        <div class="category-count">{{ category.products.count }} товаров</div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Товары -->
+            {% if products %}
+                <div class="products-grid" id="productsGrid">
+                    {% for product in products %}
+                    <div class="product-card">
+                        <div class="product-badges">
+                            {% if forloop.counter <= 3 %}
+                            <span class="product-badge badge-gradient">Хит</span>
+                            {% endif %}
+                            {% if product.has_discount %}
+                            <span class="product-badge badge-sale">-{{ product.discount_percent }}%</span>
+                            {% endif %}
+                            {% if product.is_new %}
+                            <span class="product-badge badge-new">NEW</span>
+                            {% endif %}
+                            {% if product.organic %}
+                            <span class="product-badge badge-eco">Эко</span>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="product-image">
+                            {% if product.image %}
+                            <img src="{{ product.image.url }}" alt="{{ product.name }}" 
+                                 onerror="this.src='{% static 'images/no-image.png' %}'">
+                            {% else %}
+                            <img src="{% static 'images/no-image.png' %}" alt="Нет изображения">
+                            {% endif %}
+                            <div class="product-image-overlay">
+                                <button class="quick-view-btn" onclick="quickView('{{ product.id }}')">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="product-content">
+                            <div class="product-category">{{ product.category.name }}</div>
+                            <h3 class="product-title">
+                                <a href="{{ product.get_absolute_url }}" class="text-decoration-none text-dark">
+                                    {{ product.name|truncatechars:50 }}
+                                </a>
+                            </h3>
+                            <p class="product-description">{{ product.short_description|default:""|truncatechars:100 }}</p>
+                            
+                            {% if product.rating %}
+                            <div class="product-rating">
+                                <div class="rating-stars">
+                                    {% with ''|center:5 as range %}
+                                    {% for _ in range %}
+                                        {% if forloop.counter <= product.rating %}
+                                        <i class="fas fa-star"></i>
+                                        {% elif forloop.counter <= product.rating|add:"0.5" %}
+                                        <i class="fas fa-star-half-alt"></i>
+                                        {% else %}
+                                        <i class="far fa-star"></i>
+                                        {% endif %}
+                                    {% endfor %}
+                                    {% endwith %}
+                                </div>
+                                <span class="rating-count">({{ product.review_count|default:"0" }})</span>
+                            </div>
+                            {% endif %}
+                            
+                            <div class="product-price">
+                                {% if product.has_discount %}
+                                <span class="price-current">{{ product.price }} ₽</span>
+                                <span class="price-old">{{ product.old_price }} ₽</span>
+                                {% else %}
+                                <span class="price-current">{{ product.price }} ₽</span>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="product-actions">
+                                <button class="btn btn-gradient add-to-cart" onclick="addToCart('{{ product.id }}')">
+                                    <i class="fas fa-cart-plus me-2"></i>В корзину
+                                </button>
+                                <button class="btn btn-outline-accent add-to-favorite" 
+                                        onclick="toggleFavorite('{{ product.id }}', this)">
+                                    <i class="far fa-heart"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Пагинация -->
+                {% if is_paginated %}
+                <div class="pagination-custom">
+                    {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" 
+                       class="page-link-custom">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                    {% endif %}
+                    
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                        <span class="page-link-custom active">{{ num }}</span>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <a href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" 
+                           class="page-link-custom">{{ num }}</a>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" 
+                       class="page-link-custom">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                    {% endif %}
+                </div>
+                {% endif %}
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-search display-1 text-muted"></i>
+                    <h3 class="mt-3">Товары не найдены</h3>
+                    <p class="text-muted">Попробуйте изменить параметры фильтрации</p>
+                    <a href="?" class="btn btn-gradient">Показать все товары</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно быстрого просмотра -->
+<div class="modal fade" id="quickViewModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-body p-0">
+                <!-- Контент будет загружен через AJAX -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+    <script src="{% static 'js/catalog.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,71 @@
+/* Стили для фильтров */
+.attribute-filters {
+    max-height: 200px;
+    overflow-y: auto;
+    padding: 5px;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+}
+
+.attribute-filters .form-check {
+    margin-bottom: 3px;
+}
+
+.attribute-filters .form-check-label {
+    font-size: 0.9rem;
+}
+
+/* Карточки товаров */
+.product-card {
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: none;
+}
+
+.product-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
+}
+
+.product-card .card-title a:hover {
+    color: #0d6efd !important;
+}
+
+/* Хлебные крошки */
+.breadcrumb {
+    background-color: transparent;
+    padding: 0;
+    margin-bottom: 1rem;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+    .col-lg-3, .col-md-4 {
+        margin-bottom: 20px;
+    }
+
+    .filters-sidebar {
+        position: sticky;
+        top: 20px;
+    }
+}
+
+/* Стили для выбранных фильтров */
+.filter-badge {
+    display: inline-flex;
+    align-items: center;
+    margin: 2px;
+    padding: 4px 8px;
+    background-color: #e9ecef;
+    border-radius: 20px;
+    font-size: 0.85rem;
+}
+
+.filter-badge .remove-filter {
+    margin-left: 5px;
+    cursor: pointer;
+    color: #6c757d;
+}
+
+.filter-badge .remove-filter:hover {
+    color: #dc3545;
+}
