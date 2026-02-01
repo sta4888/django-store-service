@@ -15,7 +15,7 @@ CACHE_TTL = 300  # 5 минут
     retry_backoff=10,
     retry_kwargs={"max_retries": 5},
 )
-def update_user_stats_cache(self, user_id: str):
+def update_user_stats_cache(user_id: str):
     """
     Асинхронно получает данные из FastAPI и кладёт в cache
     """

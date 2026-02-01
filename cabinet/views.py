@@ -23,6 +23,8 @@ def dashboard_view(request):
     cache_key = f"user:stats:{user_id}"
 
     stats = cache.get(cache_key)
+    logger.debug(f"stats: {stats}")
+    logger.debug(f"cache_key: {cache_key}")
 
     if stats is None:
         update_user_stats_cache.delay(user_id)

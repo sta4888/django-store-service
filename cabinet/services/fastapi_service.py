@@ -28,13 +28,14 @@ class FastAPIService:
 
         return session
 
-    def get_user_stats(self, user_id: int) -> dict:
+    def get_user_stats(self, user_id: str) -> dict:
         """
         ЧИСТО: только запрос → только данные
         """
         url = f"{self.base_url}/user/users/{user_id}/status"
 
         logger.info(f"Request FastAPI stats for user {user_id}")
+        logger.info(f"Request FastAPI url {url}")
 
         response = self.session.get(url, timeout=5)
         response.raise_for_status()
