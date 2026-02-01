@@ -1,0 +1,23 @@
+[project]
+name = "profile"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.12"
+dependencies = [
+    "django>=5.0",
+    "gunicorn>=21.2",
+    "celery>=5.3",
+    "django-celery-beat>=2.5",
+    "django-celery-results>=2.5",
+    "pillow",
+    "python-decouple",
+    "redis",
+    "whitenoise>=6.11.0",
+    "django-mptt>=0.18.0",
+    "faker>=40.1.2",
+    "django-extensions>=4.1",
+    "psycopg2-binary>=2.9.11",
+    "django-redis>=6.0.0",
+    "requests>=2.32.5",
+    "httpx>=0.28.1",
+]
