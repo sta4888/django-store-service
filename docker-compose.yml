@@ -31,10 +31,7 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
     networks:
-      backend:
-      gnet:
-        aliases:
-          - web
+      - backend
 
   celery:
     build: .
@@ -89,10 +86,6 @@ services:
 networks:
   backend:
     driver: bridge
-  gnet:
-    external: true
-    name: shared_gnet
-
 
 
 volumes:
