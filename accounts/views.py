@@ -1,3 +1,6 @@
+import json
+import logging
+
 from django.db.models import Count
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django_celery_results.models import TaskResult
@@ -11,10 +14,13 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.utils import timezone
 from django.http import Http404
+
+from cabinet.services.fastapi_service import FastAPIService
 from .models import CustomUser
 from .forms import ReferralRegistrationForm, EmailVerificationForm, LoginForm
 from .tasks import send_verification_email_task, send_welcome_email_task, send_referral_notification_task
 
+logger = logging.getLogger(__name__)
 
 def referral_register_view(request, referral_link):
     """Регистрация по реферальной ссылке"""
@@ -85,9 +91,14 @@ def verify_email_view(request):
             user.email_verification_sent_at = None
             user.save()
 
+            # fixme потом поправим на celery или перенесем на кафку или тп...
+            service = FastAPIService()
+            referrer_id = user.referrer.username if user.referrer else None
+            data = service.add_user(user_id=user.username, referrer_id=referrer_id)
+            logger.info(f"FastAPI add new user {user.username} with referrer {referrer_id}, errors {data['error']}")
+
             # Автоматический вход
             login(request, user)
-            # todo добавить отправку на сервис id нового пользователя и id реферала
             # Отправляем приветственное письмо через Celery
             send_welcome_email_task.delay(user.user_id)
 

@@ -48,3 +48,28 @@ class FastAPIService:
             raise RuntimeError(payload.get("error_msg", "FastAPI error"))
 
         return payload["data"]
+
+    def add_user(self, user_id: str, referrer_id: str) -> dict:
+        """
+        отправка данных о новом пользователе
+        """
+        url = f"{self.base_url}/user/users/"
+
+        payload = {
+            "user_id": user_id,
+            "referrer_id": referrer_id
+        }
+
+        logger.info(f"Request FastAPI add new user {user_id} with referrer {referrer_id}")
+        logger.info(f"Request FastAPI url {url} | payload: {payload}")
+
+        response = self.session.post(url, json=payload, timeout=5)
+        response.raise_for_status()
+
+        data = response.json()
+
+        if data.get("error"):
+            raise RuntimeError(data.get("error_msg", "FastAPI error"))
+
+        return data["data"]
+
