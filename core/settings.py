@@ -184,8 +184,8 @@ CACHES = {
 }
 
 # URL FastAPI сервиса
-FASTAPI_SERVICE_URL = os.environ.get('FASTAPI_URL', "http://calcservice:8001")
+FASTAPI_SERVICE_URL = os.environ.get('FASTAPI_URL', "http://http://45.130.148.158/:8001")
 
 CELERY_TASK_MAX_RETRIES = 3
 
-FASTAPI_BASE_URL="http://calcservice:8001"
+FASTAPI_BASE_URL="http://http://45.130.148.158/:8001"
