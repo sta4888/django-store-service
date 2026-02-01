@@ -95,7 +95,7 @@ def verify_email_view(request):
             service = FastAPIService()
             referrer_id = user.referrer.username if user.referrer else None
             data = service.add_user(user_id=user.username, referrer_id=referrer_id)
-            logger.info(f"FastAPI add new user {user.username} with referrer {referrer_id}, errors {data['error']}")
+            logger.info(f"FastAPI add new user {user.username} with referrer {referrer_id}")
 
             # Автоматический вход
             login(request, user)
