@@ -15,7 +15,7 @@ DEBUG = True
 
 SECURE_CROSS_ORIGIN_OPENER_POLICY = None
 
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = ["45.130.148.158", "localhost"]
 
 # Application definition
 
