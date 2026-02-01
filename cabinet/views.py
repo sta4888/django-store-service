@@ -119,3 +119,132 @@ def get_user_data(request):
         )
 
     return JsonResponse(r.json(), safe=False)
+
+
+import json
+
+
+@login_required
+def add_user_lo(request):
+    user_id = request.user.username
+
+    # Получаем данные из POST запроса
+    if request.method == 'POST':
+        try:
+            # Пытаемся получить данные из JSON
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            # Если не JSON, пробуем получить из формы
+            data = request.POST.dict()
+
+        lo_amount = data.get('lo')
+
+        if not lo_amount:
+            return JsonResponse(
+                {"error": "Параметр 'lo' не указан"},
+                status=400
+            )
+
+        try:
+            payload = {"lo": float(lo_amount)}
+
+            r = requests.post(
+                f"{FASTAPI_SERVICE_URL}/user/users/{user_id}/lo/add",
+                json=payload,
+                timeout=5
+            )
+            r.raise_for_status()
+
+            return JsonResponse(r.json(), safe=False)
+
+        except ValueError:
+            return JsonResponse(
+                {"error": "Параметр 'lo' должен быть числом"},
+                status=400
+            )
+        except requests.RequestException as e:
+            return JsonResponse(
+                {"error": str(e)},
+                status=503
+            )
+
+    # Если метод не POST
+    return JsonResponse(
+        {"error": "Метод не поддерживается. Используйте POST."},
+        status=405
+    )
+
+
+@login_required
+def sub_user_lo(request):
+    user_id = request.user.username
+
+    # Получаем данные из POST запроса
+    if request.method == 'POST':
+        try:
+            # Пытаемся получить данные из JSON
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            # Если не JSON, пробуем получить из формы
+            data = request.POST.dict()
+
+        lo_amount = data.get('lo')
+
+        if not lo_amount:
+            return JsonResponse(
+                {"error": "Параметр 'lo' не указан"},
+                status=400
+            )
+
+        try:
+            payload = {"lo": float(lo_amount)}
+
+            r = requests.post(
+                f"{FASTAPI_SERVICE_URL}/user/users/{user_id}/lo/subtract",
+                json=payload,
+                timeout=5
+            )
+            r.raise_for_status()
+
+            return JsonResponse(r.json(), safe=False)
+
+        except ValueError:
+            return JsonResponse(
+                {"error": "Параметр 'lo' должен быть числом"},
+                status=400
+            )
+        except requests.RequestException as e:
+            return JsonResponse(
+                {"error": str(e)},
+                status=503
+            )
+
+    # Если метод не POST
+    return JsonResponse(
+        {"error": "Метод не поддерживается. Используйте POST."},
+        status=405
+    )
+
+
+@login_required
+def get_user_team(request):
+    user_id = request.user.username
+    try:
+        r = requests.get(
+            f"{FASTAPI_SERVICE_URL}/user/users/{user_id}/structure",
+            timeout=5
+        )
+        r.raise_for_status()
+    except requests.RequestException as e:
+        return JsonResponse(
+            {"error": str(e)},
+            status=503
+        )
+
+    return JsonResponse(r.json(), safe=False)
+
+
+@login_required
+def api_test_page(request):
+    """Страница для тестирования API"""
+    return render(request, 'admin_api.html')

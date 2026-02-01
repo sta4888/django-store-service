@@ -1,0 +1,483 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="fas fa-code me-2"></i>API тестирование</h1>
+        <div class="text-end">
+            <div class="text-muted small">Пользователь: {{ user.username }}</div>
+            <div class="text-muted small">ID: {{ user.username }}</div>
+        </div>
+    </div>
+
+    <!-- Вкладки -->
+    <ul class="nav nav-tabs mb-4" id="apiTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="status-tab" data-bs-toggle="tab" data-bs-target="#status" type="button">
+                <i class="fas fa-info-circle me-1"></i>Статус пользователя
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="lo-tab" data-bs-toggle="tab" data-bs-target="#lo" type="button">
+                <i class="fas fa-edit me-1"></i>Управление LO
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="structure-tab" data-bs-toggle="tab" data-bs-target="#structure" type="button">
+                <i class="fas fa-sitemap me-1"></i>Структура
+            </button>
+        </li>
+    </ul>
+
+    <!-- Содержимое вкладок -->
+    <div class="tab-content" id="apiTabsContent">
+        
+        <!-- Вкладка Статус пользователя -->
+        <div class="tab-pane fade show active" id="status" role="tabpanel">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Получить статус пользователя</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Endpoint</label>
+                        <div class="input-group">
+                            <span class="input-group-text">GET</span>
+                            <input type="text" class="form-control" value="/api/user/status/" readonly>
+                        </div>
+                        <div class="form-text">Возвращает статус текущего пользователя ({{ user.username }})</div>
+                    </div>
+                    
+                    <button class="btn btn-gradient" onclick="testStatus()">
+                        <i class="fas fa-play me-2"></i>Выполнить запрос
+                    </button>
+                    
+                    <div class="mt-4" id="status-result">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Нажмите "Выполнить запрос" чтобы получить статус
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Вкладка Управление LO -->
+        <div class="tab-pane fade" id="lo" role="tabpanel">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-exchange-alt me-2"></i>Управление Личным Объемом (LO)</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Форма для добавления LO -->
+                    <div class="mb-4">
+                        <h6>Добавить LO</h6>
+                        <div class="mb-3">
+                            <label class="form-label">Endpoint</label>
+                            <div class="input-group">
+                                <span class="input-group-text">POST</span>
+                                <input type="text" class="form-control" value="/api/user/lo/add/" readonly>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Сумма LO</label>
+                            <input type="number" class="form-control" id="add-lo-amount" placeholder="Введите сумму" step="0.01" min="0.01" value="100">
+                            <div class="form-text">Payload: {"lo": amount}</div>
+                        </div>
+                        
+                        <button class="btn btn-success" onclick="addLo()">
+                            <i class="fas fa-plus-circle me-2"></i>Добавить LO
+                        </button>
+                    </div>
+                    
+                    <!-- Форма для вычитания LO -->
+                    <div class="mb-4">
+                        <h6>Вычесть LO</h6>
+                        <div class="mb-3">
+                            <label class="form-label">Endpoint</label>
+                            <div class="input-group">
+                                <span class="input-group-text">POST</span>
+                                <input type="text" class="form-control" value="/api/user/lo/subtract/" readonly>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Сумма LO</label>
+                            <input type="number" class="form-control" id="sub-lo-amount" placeholder="Введите сумму" step="0.01" min="0.01" value="50">
+                            <div class="form-text">Payload: {"lo": amount}</div>
+                        </div>
+                        
+                        <button class="btn btn-danger" onclick="subtractLo()">
+                            <i class="fas fa-minus-circle me-2"></i>Вычесть LO
+                        </button>
+                    </div>
+                    
+                    <div id="lo-result">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Выберите операцию для выполнения
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Вкладка Структура -->
+        <div class="tab-pane fade" id="structure" role="tabpanel">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-sitemap me-2"></i>Получить структуру команды</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Endpoint</label>
+                        <div class="input-group">
+                            <span class="input-group-text">GET</span>
+                            <input type="text" class="form-control" value="/api/user/team/" readonly>
+                        </div>
+                        <div class="form-text">Возвращает структуру команды текущего пользователя ({{ user.username }})</div>
+                    </div>
+                    
+                    <button class="btn btn-gradient" onclick="getTeam()">
+                        <i class="fas fa-project-diagram me-2"></i>Получить структуру
+                    </button>
+                    
+                    <div class="mt-4" id="team-result">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Нажмите "Получить структуру" чтобы увидеть вашу команду
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- История запросов -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="fas fa-history me-2"></i>История запросов</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover" id="request-history">
+                    <thead>
+                        <tr>
+                            <th>Время</th>
+                            <th>Метод</th>
+                            <th>Эндпоинт</th>
+                            <th>Данные</th>
+                            <th>Результат</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td colspan="5" class="text-center text-muted">Нет записей</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const CSRF_TOKEN = "{{ csrf_token }}";
+
+// Функция для добавления записи в историю
+function addToHistory(method, endpoint, data, result) {
+    const table = document.querySelector('#request-history tbody');
+    
+    // Убираем placeholder если он есть
+    if (table.rows.length === 1 && table.rows[0].cells[0].colSpan) {
+        table.innerHTML = '';
+    }
+    
+    const now = new Date().toLocaleString('ru-RU');
+    const row = document.createElement('tr');
+    
+    row.innerHTML = `
+        <td>${now}</td>
+        <td><span class="badge ${method === 'GET' ? 'bg-success' : 'bg-primary'}">${method}</span></td>
+        <td><code>${endpoint}</code></td>
+        <td>${data ? JSON.stringify(data) : '-'}</td>
+        <td>${result}</td>
+    `;
+    
+    table.insertBefore(row, table.firstChild);
+}
+
+// Получение статуса
+async function testStatus() {
+    const resultDiv = document.getElementById('status-result');
+    resultDiv.innerHTML = `
+        <div class="alert alert-info">
+            <i class="fas fa-spinner fa-spin me-2"></i>
+            Получение статуса пользователя...
+        </div>
+    `;
+    
+    try {
+        const response = await fetch('/api/user/status/');
+        const data = await response.json();
+        
+        if (response.ok) {
+            resultDiv.innerHTML = `
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle me-2"></i>
+                    Статус получен успешно!
+                </div>
+                <div class="mt-3">
+                    <pre class="bg-light p-3 rounded"><code>${JSON.stringify(data, null, 2)}</code></pre>
+                </div>
+            `;
+            
+            addToHistory('GET', '/api/user/status/', null, 'Успешно');
+            
+        } else {
+            resultDiv.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-times-circle me-2"></i>
+                    Ошибка: ${data.error || 'Неизвестная ошибка'}
+                </div>
+            `;
+            
+            addToHistory('GET', '/api/user/status/', null, 'Ошибка');
+        }
+        
+    } catch (error) {
+        resultDiv.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-times-circle me-2"></i>
+                Ошибка сети: ${error.message}
+            </div>
+        `;
+        
+        addToHistory('GET', '/api/user/status/', null, 'Ошибка сети');
+    }
+}
+
+// Добавление LO
+async function addLo() {
+    const amount = parseFloat(document.getElementById('add-lo-amount').value);
+    const resultDiv = document.getElementById('lo-result');
+    
+    if (!amount || amount <= 0) {
+        resultDiv.innerHTML = `
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Введите корректную сумму (больше 0)
+            </div>
+        `;
+        return;
+    }
+    
+    resultDiv.innerHTML = `
+        <div class="alert alert-info">
+            <i class="fas fa-spinner fa-spin me-2"></i>
+            Добавление ${amount} LO...
+        </div>
+    `;
+    
+    try {
+        const payload = { lo: amount };
+        const response = await fetch('/api/user/lo/add/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': CSRF_TOKEN
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            resultDiv.innerHTML = `
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle me-2"></i>
+                    Успешно добавлено ${amount} LO!
+                </div>
+                <div class="mt-3">
+                    <pre class="bg-light p-3 rounded"><code>${JSON.stringify(data, null, 2)}</code></pre>
+                </div>
+            `;
+            
+            addToHistory('POST', '/api/user/lo/add/', payload, 'Успешно');
+            
+        } else {
+            resultDiv.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-times-circle me-2"></i>
+                    Ошибка: ${data.error || 'Неизвестная ошибка'}
+                </div>
+            `;
+            
+            addToHistory('POST', '/api/user/lo/add/', payload, 'Ошибка');
+        }
+        
+    } catch (error) {
+        resultDiv.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-times-circle me-2"></i>
+                Ошибка сети: ${error.message}
+            </div>
+        `;
+        
+        addToHistory('POST', '/api/user/lo/add/', { lo: amount }, 'Ошибка сети');
+    }
+}
+
+// Вычитание LO
+async function subtractLo() {
+    const amount = parseFloat(document.getElementById('sub-lo-amount').value);
+    const resultDiv = document.getElementById('lo-result');
+    
+    if (!amount || amount <= 0) {
+        resultDiv.innerHTML = `
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Введите корректную сумму (больше 0)
+            </div>
+        `;
+        return;
+    }
+    
+    if (!confirm(`Вы уверены, что хотите вычесть ${amount} LO?`)) {
+        return;
+    }
+    
+    resultDiv.innerHTML = `
+        <div class="alert alert-info">
+            <i class="fas fa-spinner fa-spin me-2"></i>
+            Вычитание ${amount} LO...
+        </div>
+    `;
+    
+    try {
+        const payload = { lo: amount };
+        const response = await fetch('/api/user/lo/subtract/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': CSRF_TOKEN
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            resultDiv.innerHTML = `
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle me-2"></i>
+                    Успешно вычтено ${amount} LO!
+                </div>
+                <div class="mt-3">
+                    <pre class="bg-light p-3 rounded"><code>${JSON.stringify(data, null, 2)}</code></pre>
+                </div>
+            `;
+            
+            addToHistory('POST', '/api/user/lo/subtract/', payload, 'Успешно');
+            
+        } else {
+            resultDiv.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-times-circle me-2"></i>
+                    Ошибка: ${data.error || 'Неизвестная ошибка'}
+                </div>
+            `;
+            
+            addToHistory('POST', '/api/user/lo/subtract/', payload, 'Ошибка');
+        }
+        
+    } catch (error) {
+        resultDiv.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-times-circle me-2"></i>
+                Ошибка сети: ${error.message}
+            </div>
+        `;
+        
+        addToHistory('POST', '/api/user/lo/subtract/', { lo: amount }, 'Ошибка сети');
+    }
+}
+
+// Получение структуры команды
+async function getTeam() {
+    const resultDiv = document.getElementById('team-result');
+    resultDiv.innerHTML = `
+        <div class="alert alert-info">
+            <i class="fas fa-spinner fa-spin me-2"></i>
+            Получение структуры команды...
+        </div>
+    `;
+    
+    try {
+        const response = await fetch('/api/user/team/');
+        const data = await response.json();
+        
+        if (response.ok) {
+            resultDiv.innerHTML = `
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle me-2"></i>
+                    Структура команды получена!
+                </div>
+                <div class="mt-3">
+                    <pre class="bg-light p-3 rounded"><code>${JSON.stringify(data, null, 2)}</code></pre>
+                </div>
+            `;
+            
+            addToHistory('GET', '/api/user/team/', null, 'Успешно');
+            
+        } else {
+            resultDiv.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-times-circle me-2"></i>
+                    Ошибка: ${data.error || 'Неизвестная ошибка'}
+                </div>
+            `;
+            
+            addToHistory('GET', '/api/user/team/', null, 'Ошибка');
+        }
+        
+    } catch (error) {
+        resultDiv.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-times-circle me-2"></i>
+                Ошибка сети: ${error.message}
+            </div>
+        `;
+        
+        addToHistory('GET', '/api/user/team/', null, 'Ошибка сети');
+    }
+}
+</script>
+
+<style>
+.nav-tabs .nav-link {
+    font-weight: 500;
+}
+
+.nav-tabs .nav-link.active {
+    border-color: var(--color-red) var(--color-red) #fff;
+    border-bottom: 2px solid var(--color-red);
+    color: var(--color-red);
+}
+
+pre code {
+    font-size: 0.9rem;
+    font-family: 'Courier New', monospace;
+}
+
+.table-sm th, .table-sm td {
+    padding: 0.5rem;
+}
+
+.badge.bg-primary {
+    background-color: var(--color-orange) !important;
+}
+</style>
+{% endblock %}
