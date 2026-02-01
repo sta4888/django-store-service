@@ -11,9 +11,9 @@
                     <div class="user-info">
                         <div class="user-avatar">
                             {% if user.first_name %}
-                                {{ user.first_name|first|upper }}{{ user.last_name|first|upper }}
+                            {{ user.first_name|first|upper }}{{ user.last_name|first|upper }}
                             {% else %}
-                                {{ user.username|first|upper }}
+                            {{ user.username|first|upper }}
                             {% endif %}
                         </div>
                         <div>
@@ -33,15 +33,15 @@
                     <li><a href="#"><i class="fas fa-link"></i> Реферальная ссылка</a></li>
                     <li><a href="#"><i class="fas fa-user-plus"></i> Регистрация пользователя</a></li>
                     <li><a href="#"><i class="fas fa-sitemap"></i> Моя структура</a></li>
-<!--                    <li><a href="{% url 'cabinet:purchases' %}">-->
+                    <!--                    <li><a href="{% url 'cabinet:purchases' %}">-->
                     <li><a href="#">
                         <i class="fas fa-shopping-bag"></i> Мои покупки</a>
                     </li>
                     <li><a href="#"><i class="fas fa-newspaper"></i> Новости компании</a></li>
                     <li><a href="#"><i class="fas fa-wallet"></i> Финансы</a></li>
-<!--                    <li><a href="{% url 'cabinet:finance' %}"><i class="fas fa-wallet"></i> Финансы</a></li>-->
+                    <!--                    <li><a href="{% url 'cabinet:finance' %}"><i class="fas fa-wallet"></i> Финансы</a></li>-->
                     <li><a href="#"><i class="fas fa-cog"></i> Настройки</a></li>
-<!--                    <li><a href="{% url 'cabinet:profile' %}"><i class="fas fa-cog"></i> Настройки</a></li>-->
+                    <!--                    <li><a href="{% url 'cabinet:profile' %}"><i class="fas fa-cog"></i> Настройки</a></li>-->
                 </ul>
             </div>
         </div>
@@ -59,124 +59,124 @@
 
             <!-- Статистика -->
             <div class="stats-grid" id="stats-container">
-    <div class="stat-card">
-        <div class="d-flex justify-content-between align-items-start">
-            <div>
-                <div class="stat-label">Личный объем</div>
-                <div class="stat-value" id="personal-volume">
-                    {% if has_stats %}
-                        {{ user_stats.lo|floatformat:0 }} сум
-                    {% else %}
-                        <span class="text-muted">
+                <div class="stat-card">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="stat-label">Личный объем</div>
+                            <div class="stat-value" id="personal-volume">
+                                {% if has_stats %}
+                                {{ user_stats.lo|floatformat:0 }} сум
+                                {% else %}
+                                <span class="text-muted">
                             <i class="fas fa-spinner fa-spin"></i> Загрузка...
                         </span>
-                    {% endif %}
+                                {% endif %}
+                            </div>
+                            <div class="stat-change positive">
+                                <i class="fas fa-arrow-up me-1"></i> +{{ monthly_growth }}% за месяц
+                            </div>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="fas fa-chart-line fa-2x" style="color: var(--color-red);"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <small>Квалификация</small>
+                            <small id="qualification">
+                                {% if has_stats %}
+                                {{ user_stats.qualification|default:"-" }}
+                                {% else %}
+                                -
+                                {% endif %}
+                            </small>
+                        </div>
+                        <div class="progress-custom">
+                            <div class="progress-bar-custom" style="width: {{ progress_to_next_level }}%"></div>
+                        </div>
+                    </div>
                 </div>
-                <div class="stat-change positive">
-                    <i class="fas fa-arrow-up me-1"></i> +{{ monthly_growth }}% за месяц
-                </div>
-            </div>
-            <div class="stat-icon">
-                <i class="fas fa-chart-line fa-2x" style="color: var(--color-red);"></i>
-            </div>
-        </div>
-        <div class="mt-3">
-            <div class="d-flex justify-content-between mb-1">
-                <small>Квалификация</small>
-                <small id="qualification">
-                    {% if has_stats %}
-                        {{ user_stats.qualification|default:"-" }}
-                    {% else %}
-                        -
-                    {% endif %}
-                </small>
-            </div>
-            <div class="progress-custom">
-                <div class="progress-bar-custom" style="width: {{ progress_to_next_level }}%"></div>
-            </div>
-        </div>
-    </div>
 
-    <div class="stat-card">
-        <div class="d-flex justify-content-between align-items-start">
-            <div>
-                <div class="stat-label">Групповой объем</div>
-                <div class="stat-value" id="group-volume">
-                    {% if has_stats %}
-                        {{ user_stats.go|floatformat:0 }} сум
-                    {% else %}
-                        <span class="text-muted">
+                <div class="stat-card">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="stat-label">Групповой объем</div>
+                            <div class="stat-value" id="group-volume">
+                                {% if has_stats %}
+                                {{ user_stats.go|floatformat:0 }} сум
+                                {% else %}
+                                <span class="text-muted">
                             <i class="fas fa-spinner fa-spin"></i> Загрузка...
                         </span>
-                    {% endif %}
-                </div>
-                <div class="stat-change positive">
-                    <i class="fas fa-arrow-up me-1"></i> +{{ group_growth }}% за месяц
-                </div>
-            </div>
-            <div class="stat-icon">
-                <i class="fas fa-users fa-2x" style="color: var(--color-orange);"></i>
-            </div>
-        </div>
-        <div class="mt-3">
-            <div class="d-flex justify-content-between align-items-center">
-                <small>Баллы</small>
-                <span class="badge bg-gradient" id="points">
+                                {% endif %}
+                            </div>
+                            <div class="stat-change positive">
+                                <i class="fas fa-arrow-up me-1"></i> +{{ group_growth }}% за месяц
+                            </div>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="fas fa-users fa-2x" style="color: var(--color-orange);"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small>Баллы</small>
+                            <span class="badge bg-gradient" id="points">
                     {% if has_stats %}
                         {{ user_stats.points|floatformat:0 }}
                     {% else %}
                         0
                     {% endif %}
                 </span>
-            </div>
-        </div>
-    </div>
+                        </div>
+                    </div>
+                </div>
 
-    <div class="stat-card">
-        <div class="d-flex justify-content-between align-items-start">
-            <div>
-                <div class="stat-label">Начисления</div>
-                <div class="stat-value" id="total-income">
-                    {% if has_stats %}
-                        {{ user_stats.total_income|floatformat:0 }} сум
-                    {% else %}
-                        <span class="text-muted">
+                <div class="stat-card">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="stat-label">Начисления</div>
+                            <div class="stat-value" id="total-income">
+                                {% if has_stats %}
+                                {{ user_stats.total_income|floatformat:0 }} сум
+                                {% else %}
+                                <span class="text-muted">
                             <i class="fas fa-spinner fa-spin"></i> Загрузка...
                         </span>
-                    {% endif %}
-                </div>
-                <div class="stat-change positive">
-                    <i class="fas fa-arrow-up me-1"></i> +{{ earnings_growth }}% за месяц
-                </div>
-            </div>
-            <div class="stat-icon">
-                <i class="fas fa-wallet fa-2x" style="color: var(--color-orange);"></i>
-            </div>
-        </div>
-        <div class="mt-3">
-            <div class="d-flex justify-content-between align-items-center">
-                <small>Доступно для вывода</small>
-                <span class="badge bg-success" id="personal-money">
+                                {% endif %}
+                            </div>
+                            <div class="stat-change positive">
+                                <i class="fas fa-arrow-up me-1"></i> +{{ earnings_growth }}% за месяц
+                            </div>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="fas fa-wallet fa-2x" style="color: var(--color-orange);"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small>Доступно для вывода</small>
+                            <span class="badge bg-success" id="personal-money">
                     {% if has_stats %}
                         {{ user_stats.personal_money|floatformat:0 }} сум
                     {% else %}
                         0
                     {% endif %}
                 </span>
+                        </div>
+                    </div>
+                </div>
             </div>
-        </div>
-    </div>
-</div>
 
-<!-- Кнопка обновления -->
-<div class="text-end mt-3">
-    <button class="btn btn-sm btn-outline-primary" id="refresh-stats-btn">
-        <i class="fas fa-sync-alt me-1"></i> Обновить данные
-    </button>
-    <small class="text-muted ms-2" id="last-updated">
-        {% if has_stats %}Данные актуальны{% else %}Обновление...{% endif %}
-    </small>
-</div>
+            <!-- Кнопка обновления -->
+            <div class="text-end mt-3">
+                <button class="btn btn-sm btn-outline-primary" id="refresh-stats-btn">
+                    <i class="fas fa-sync-alt me-1"></i> Обновить данные
+                </button>
+                <small class="text-muted ms-2" id="last-updated">
+                    {% if has_stats %}Данные актуальны{% else %}Обновление...{% endif %}
+                </small>
+            </div>
 
             <!-- Быстрые действия -->
             <div class="actions-grid mb-4">
@@ -187,24 +187,24 @@
                     <h4>Реферальная ссылка</h4>
                     <p class="text-muted small mb-3">Приглашайте новых партнеров по вашей уникальной ссылке</p>
                     <!-- В разделе "Реферальная ссылка" обновите: -->
-<div class="input-group mb-3">
-    <input type="text" class="form-control"
-           value="{{ request.scheme }}://{{ request.get_host }}/register/{{ user.referral_link }}/"
-           readonly id="referralLink">
-    <button class="btn btn-gradient" type="button" onclick="copyReferralLink()">
-        <i class="fas fa-copy"></i>
-    </button>
-</div>
+                    <div class="input-group mb-3">
+                        <input type="text" class="form-control"
+                               value="{{ request.scheme }}://{{ request.get_host }}/register/{{ user.referral_link }}/"
+                               readonly id="referralLink">
+                        <button class="btn btn-gradient" type="button" onclick="copyReferralLink()">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
 
-<!-- Добавьте кнопку для генерации новой ссылки: -->
-<div class="mt-3 text-center">
-    <a href="{% url 'accounts:generate_new_link' %}" class="btn btn-outline-accent btn-sm">
-        <i class="fas fa-sync-alt me-1"></i>Сгенерировать новую ссылку
-    </a>
-    <div class="form-text small mt-1">
-        После генерации старая ссылка перестанет работать
-    </div>
-</div>
+                    <!-- Добавьте кнопку для генерации новой ссылки: -->
+                    <div class="mt-3 text-center">
+                        <a href="{% url 'accounts:generate_new_link' %}" class="btn btn-outline-accent btn-sm">
+                            <i class="fas fa-sync-alt me-1"></i>Сгенерировать новую ссылку
+                        </a>
+                        <div class="form-text small mt-1">
+                            После генерации старая ссылка перестанет работать
+                        </div>
+                    </div>
                 </div>
 
                 <div class="action-card">
@@ -230,7 +230,8 @@
                         <p class="text-muted small mb-0">История начислений за последний месяц</p>
                     </div>
                     <div class="text-end">
-                        <div class="h4 mb-1" style="color: var(--color-red);">+{{ user.earnings|floatformat:0 }} сум</div>
+                        <div class="h4 mb-1" style="color: var(--color-red);">+{{ user.earnings|floatformat:0 }} сум
+                        </div>
                         <div class="text-success small">
                             <i class="fas fa-arrow-up me-1"></i> +8.7% к прошлому месяцу
                         </div>
@@ -275,6 +276,7 @@
                         <label class="form-label">Страна</label>
                         <select class="form-select" required>
                             <option value="">Выберите страну</option>
+                            <option value="UZ">Узбекистан</option>
                             <option value="RU">Россия</option>
                             <option value="KZ">Казахстан</option>
                             <option value="BY">Беларусь</option>
@@ -297,74 +299,70 @@
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const refreshBtn = document.getElementById('refresh-stats-btn');
-    const lastUpdated = document.getElementById('last-updated');
+    document.addEventListener('DOMContentLoaded', function () {
+        const refreshBtn = document.getElementById('refresh-stats-btn');
+        const lastUpdated = document.getElementById('last-updated');
 
-    // Функция обновления данных
-    function refreshStats(showNotification = true) {
-        if (showNotification) {
-            lastUpdated.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Обновление...';
+        // Функция обновления данных
+        function refreshStats(showNotification = true) {
+            if (showNotification) {
+                lastUpdated.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Обновление...';
+            }
+
+            fetch('api/get-data/')
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.error) {
+                        updateUI(data.data);
+                        lastUpdated.innerHTML = '<i class="fas fa-check text-success"></i> Данные обновлены';
+                        if (showNotification) showToast('Данные успешно обновлены', 'success');
+                    } else {
+                        lastUpdated.innerHTML = '<i class="fas fa-exclamation-triangle text-warning"></i> Ошибка обновления';
+                        if (showNotification) showToast('Не удалось обновить данные', 'error');
+                    }
+
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    lastUpdated.innerHTML = '<i class="fas fa-exclamation-triangle text-danger"></i> Ошибка сети';
+                    if (showNotification) {
+                        showToast('Ошибка сети', 'error');
+                    }
+                });
         }
 
-        fetch('api/get-data/')
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    updateUI(data.data);
-                    lastUpdated.innerHTML = '<i class="fas fa-check text-success"></i> Данные обновлены';
+        // Функция обновления UI
+        function updateUI(stats) {
+            // Форматирование чисел с пробелами
+            function formatNumber(num) {
+                return new Intl.NumberFormat('ru-RU').format(Math.round(num));
+            }
 
-                    if (showNotification) {
-                        showToast('Данные успешно обновлены', 'success');
-                    }
-                } else {
-                    lastUpdated.innerHTML = '<i class="fas fa-exclamation-triangle text-warning"></i> Ошибка обновления';
-                    if (showNotification) {
-                        showToast('Не удалось обновить данные', 'error');
-                    }
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                lastUpdated.innerHTML = '<i class="fas fa-exclamation-triangle text-danger"></i> Ошибка сети';
-                if (showNotification) {
-                    showToast('Ошибка сети', 'error');
-                }
-            });
-    }
-
-    // Функция обновления UI
-    function updateUI(stats) {
-        // Форматирование чисел с пробелами
-        function formatNumber(num) {
-            return new Intl.NumberFormat('ru-RU').format(Math.round(num));
+            // Обновляем значения
+            document.getElementById('personal-volume').textContent = formatNumber(stats.lo) + ' сум';
+            document.getElementById('group-volume').textContent = formatNumber(stats.go) + ' сум';
+            document.getElementById('total-income').textContent = formatNumber(stats.total_income) + ' сум';
+            document.getElementById('personal-money').textContent = formatNumber(stats.personal_money) + ' сум';
+            document.getElementById('qualification').textContent = stats.qualification || '-';
+            document.getElementById('points').textContent = formatNumber(stats.points);
         }
 
-        // Обновляем значения
-        document.getElementById('personal-volume').textContent = formatNumber(stats.lo) + ' сум';
-        document.getElementById('group-volume').textContent = formatNumber(stats.go) + ' сум';
-        document.getElementById('total-income').textContent = formatNumber(stats.total_income) + ' сум';
-        document.getElementById('personal-money').textContent = formatNumber(stats.personal_money) + ' сум';
-        document.getElementById('qualification').textContent = stats.qualification || '-';
-        document.getElementById('points').textContent = formatNumber(stats.points);
-    }
+        // Функция показа уведомлений
+        function showToast(message, type = 'info') {
+            // Используйте свою систему уведомлений или toastr.js
+            console.log(`${type}: ${message}`);
+        }
 
-    // Функция показа уведомлений
-    function showToast(message, type = 'info') {
-        // Используйте свою систему уведомлений или toastr.js
-        console.log(`${type}: ${message}`);
-    }
+        // Обработчик кнопки обновления
+        refreshBtn.addEventListener('click', function () {
+            refreshStats(true);
+        });
 
-    // Обработчик кнопки обновления
-    refreshBtn.addEventListener('click', function() {
-        refreshStats(true);
+        // Автоматическое обновление каждые 2 минуты
+        setInterval(() => refreshStats(false), 120000);
+
+        // Первое обновление через 10 секунд после загрузки страницы
+        setTimeout(() => refreshStats(false), 10000);
     });
-
-    // Автоматическое обновление каждые 2 минуты
-    setInterval(() => refreshStats(false), 120000);
-
-    // Первое обновление через 10 секунд после загрузки страницы
-    setTimeout(() => refreshStats(false), 10000);
-});
 </script>
 {% endblock %}
