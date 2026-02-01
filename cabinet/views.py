@@ -1,6 +1,7 @@
 import json
 import logging
 
+import requests
 from django.core.cache import cache
 
 from .tasks import update_user_stats_cache
@@ -98,3 +99,20 @@ def get_stats_json(request):
     return JsonResponse(
         {"status": "ok", "data": stats}
     )
+
+
+@login_required
+def get_user_data(request):
+    try:
+        r = requests.get(
+            "http://45.130.148.158:8001/user/users/00000009/status",
+            timeout=5
+        )
+        r.raise_for_status()
+    except requests.RequestException as e:
+        return JsonResponse(
+            {"error": str(e)},
+            status=503
+        )
+
+    return JsonResponse(r.json(), safe=False)

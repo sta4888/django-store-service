@@ -11,4 +11,5 @@ urlpatterns = [
     path('finance/', views.finance_view, name='finance'),
     path('api/refresh-stats/', views.refresh_stats, name='refresh_stats'),
     path('api/get-stats/', views.get_stats_json, name='get_stats_json'),
+    path('api/get-data/', views.get_user_data, name='get_data_json'),
 ]
