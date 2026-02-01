@@ -24,7 +24,7 @@ def dashboard_view(request):
 
     stats = cache.get(cache_key)
 
-    if not stats:
+    if stats is None:
         update_user_stats_cache.delay(user_id)
 
     return render(
