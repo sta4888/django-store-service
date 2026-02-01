@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+
+{% block title %}Подтверждение Email{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-lg border-0">
+                <div class="card-body p-5">
+                    <div class="text-center mb-5">
+                        <div class="logo-square mx-auto mb-3">
+                            <i class="fas fa-envelope"></i>
+                        </div>
+                        <h2 class="fw-bold">Подтверждение Email</h2>
+                        <p class="text-muted">
+                            На почту <strong>{{ email }}</strong> отправлен код подтверждения
+                        </p>
+                    </div>
+
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+
+                        {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {% for error in form.non_field_errors %}
+                            {{ error }}
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        <div class="mb-4">
+                            <label class="form-label">{{ form.verification_code.label }}</label>
+                            <div class="input-group">
+                                {{ form.verification_code }}
+                                <button class="btn btn-outline-secondary" type="button"
+                                        onclick="autoFillCode()" title="Автозаполнение">
+                                    <i class="fas fa-magic"></i>
+                                </button>
+                            </div>
+                            {% if form.verification_code.errors %}
+                            <div class="text-danger small mt-1">
+                                {{ form.verification_code.errors }}
+                            </div>
+                            {% endif %}
+                            <div class="form-text">
+                                Введите 6-значный код из письма. Код действителен 15 минут.
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2 mb-4">
+                            <button type="submit" class="btn btn-gradient btn-lg">
+                                <i class="fas fa-check-circle me-2"></i>Подтвердить Email
+                            </button>
+
+                            <a href="{% url 'accounts:resend_code' %}" class="btn btn-outline-accent">
+                                <i class="fas fa-redo me-2"></i>Отправить код повторно
+                            </a>
+                        </div>
+
+                        <div class="text-center">
+                            <p class="mb-0 small text-muted">
+                                Не получили письмо? Проверьте папку "Спам" или
+                                <a href="{% url 'accounts:resend_code' %}" class="text-decoration-none">
+                                    запросите новый код
+                                </a>
+                            </p>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!--todo тут js-->
+
+{% endblock %}

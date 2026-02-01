@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Подтверждение email</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f9f9f9;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #E53935, #FF8C00);
+            padding: 30px;
+            text-align: center;
+            color: white;
+        }
+        .logo {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .content {
+            padding: 40px;
+        }
+        .code-container {
+            background: linear-gradient(135deg, rgba(229, 57, 53, 0.1), rgba(255, 140, 0, 0.1));
+            border-radius: 10px;
+            padding: 25px;
+            text-align: center;
+            margin: 30px 0;
+            border: 2px solid #E53935;
+        }
+        .verification-code {
+            font-size: 42px;
+            font-weight: bold;
+            letter-spacing: 10px;
+            color: #E53935;
+            margin: 15px 0;
+        }
+        .footer {
+            background-color: #f5f5f5;
+            padding: 20px;
+            text-align: center;
+            font-size: 14px;
+            color: #666;
+            border-top: 1px solid #eee;
+        }
+        .btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #E53935, #FF8C00);
+            color: white;
+            text-decoration: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+        .warning {
+            background-color: #FFF3CD;
+            border: 1px solid #FFEEBA;
+            color: #856404;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">EVERON</div>
+            <h1>Подтверждение Email</h1>
+        </div>
+
+        <div class="content">
+            <h2>Здравствуйте, {{ username }}!</h2>
+
+            <p>Благодарим вас за регистрацию в системе EVERON. Для завершения регистрации
+            и активации вашего аккаунта необходимо подтвердить ваш email адрес.</p>
+
+            <p>Используйте следующий код подтверждения:</p>
+
+            <div class="code-container">
+                <div class="verification-code">{{ code }}</div>
+                <p>Введите этот 6-значный код на странице подтверждения</p>
+            </div>
+
+            <div class="warning">
+                <strong>⚠️ Внимание:</strong> Код действителен в течение 15 минут.
+                Если вы не запрашивали этот код, проигнорируйте это письмо.
+            </div>
+
+            <p>Если у вас возникли проблемы с подтверждением email,
+            пожалуйста, свяжитесь с нашей службой поддержки:
+            <a href="mailto:{{ support_email }}">{{ support_email }}</a></p>
+
+            <p>С уважением,<br>
+            Команда EVERON</p>
+        </div>
+
+        <div class="footer">
+            <p>© {% now "Y" %} EVERON. Все права защищены.</p>
+            <p>Это письмо было отправлено автоматически. Пожалуйста, не отвечайте на него.</p>
+        </div>
+    </div>
+</body>
+</html>

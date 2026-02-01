@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+
+{% block title %}Регистрация в системе{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-lg border-0">
+                <div class="card-body p-5">
+                    <div class="text-center mb-5">
+                        <div class="logo-square mx-auto mb-3">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <h2 class="fw-bold">Как зарегистрироваться</h2>
+                        <p class="text-muted">Станьте частью команды EVERON</p>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-4">
+                            <div class="card h-100 border-0 shadow-sm">
+                                <div class="card-body text-center p-4">
+                                    <div class="step-icon mb-3">
+                                        <span class="badge bg-gradient rounded-circle p-3">
+                                            <i class="fas fa-link fa-2x"></i>
+                                        </span>
+                                    </div>
+                                    <h4 class="fw-bold">1. Получите ссылку</h4>
+                                    <p class="text-muted">
+                                        Попросите реферальную ссылку у партнера, 
+                                        который уже работает с EVERON
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6 mb-4">
+                            <div class="card h-100 border-0 shadow-sm">
+                                <div class="card-body text-center p-4">
+                                    <div class="step-icon mb-3">
+                                        <span class="badge bg-gradient rounded-circle p-3">
+                                            <i class="fas fa-user-plus fa-2x"></i>
+                                        </span>
+                                    </div>
+                                    <h4 class="fw-bold">2. Зарегистрируйтесь</h4>
+                                    <p class="text-muted">
+                                        Перейдите по ссылке и заполните форму регистрации 
+                                        со всеми необходимыми данными
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6 mb-4">
+                            <div class="card h-100 border-0 shadow-sm">
+                                <div class="card-body text-center p-4">
+                                    <div class="step-icon mb-3">
+                                        <span class="badge bg-gradient rounded-circle p-3">
+                                            <i class="fas fa-envelope fa-2x"></i>
+                                        </span>
+                                    </div>
+                                    <h4 class="fw-bold">3. Подтвердите Email</h4>
+                                    <p class="text-muted">
+                                        Проверьте вашу почту и введите код подтверждения 
+                                        для активации аккаунта
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6 mb-4">
+                            <div class="card h-100 border-0 shadow-sm">
+                                <div class="card-body text-center p-4">
+                                    <div class="step-icon mb-3">
+                                        <span class="badge bg-gradient rounded-circle p-3">
+                                            <i class="fas fa-sign-in-alt fa-2x"></i>
+                                        </span>
+                                    </div>
+                                    <h4 class="fw-bold">4. Начните работу</h4>
+                                    <p class="text-muted">
+                                        Войдите в личный кабинет используя ваш ID 
+                                        и приступайте к работе
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-5 text-center">
+                        <div class="alert alert-info">
+                            <h5 class="alert-heading">
+                                <i class="fas fa-info-circle me-2"></i>Важная информация
+                            </h5>
+                            <p class="mb-0">
+                                Регистрация возможна только по реферальной ссылке. 
+                                Это система MLM (многоуровневого маркетинга), где каждый 
+                                новый партнер присоединяется через существующего участника.
+                            </p>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <a href="{% url 'accounts:login' %}" class="btn btn-gradient btn-lg">
+                                <i class="fas fa-sign-in-alt me-2"></i>Вернуться ко входу
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Добро пожаловать в EVERON</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #E53935, #FF8C00); color: white; padding: 20px; text-align: center; }
+        .content { padding: 20px; background: #f9f9f9; }
+        .footer { background: #eee; padding: 10px; text-align: center; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Добро пожаловать в EVERON!</h1>
+        </div>
+        <div class="content">
+            <h2>Поздравляем, {{ user.get_full_name }}!</h2>
+            <p>Ваш аккаунт успешно активирован.</p>
+            <p><strong>Ваш ID для входа:</strong> {{ user.user_id }}</p>
+            <p>Теперь вы можете:</p>
+            <ul>
+                <li>Войти в личный кабинет</li>
+                <li>Приглашать новых партнеров по вашей реферальной ссылке</li>
+                <li>Начинать строить свою бизнес-структуру</li>
+            </ul>
+        </div>
+        <div class="footer">
+            © {% now "Y" %} EVERON
+        </div>
+    </div>
+</body>
+</html>

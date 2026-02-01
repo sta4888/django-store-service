@@ -1,0 +1,209 @@
+{% extends 'base.html' %}
+
+{% block title %}Результаты задач Celery{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <h1 class="mb-4">Результаты выполнения задач Celery</h1>
+    
+    <!-- Статистика -->
+    <div class="row mb-4">
+        <div class="col-md-2 col-6 mb-3">
+            <div class="card text-center h-100">
+                <div class="card-body">
+                    <h6 class="card-title text-muted">Всего задач</h6>
+                    <h3 class="text-primary">{{ stats.total }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 col-6 mb-3">
+            <div class="card text-center h-100">
+                <div class="card-body">
+                    <h6 class="card-title text-muted">Успешно</h6>
+                    <h3 class="text-success">{{ stats.success }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 col-6 mb-3">
+            <div class="card text-center h-100">
+                <div class="card-body">
+                    <h6 class="card-title text-muted">С ошибкой</h6>
+                    <h3 class="text-danger">{{ stats.failure }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 col-6 mb-3">
+            <div class="card text-center h-100">
+                <div class="card-body">
+                    <h6 class="card-title text-muted">Сегодня</h6>
+                    <h3>{{ stats.today }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 col-6 mb-3">
+            <div class="card text-center h-100">
+                <div class="card-body">
+                    <h6 class="card-title text-muted">За 7 дней</h6>
+                    <h3>{{ stats.last_7_days }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Фильтры -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Фильтры</h5>
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Название задачи</label>
+                    <input type="text" name="task_name" class="form-control" 
+                           value="{{ task_name }}" placeholder="Например: send_verification_email">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Статус</label>
+                    <select name="status" class="form-select">
+                        <option value="">Все</option>
+                        {% for choice in status_choices %}
+                        <option value="{{ choice }}" {% if status == choice %}selected{% endif %}>
+                            {{ choice }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">С даты</label>
+                    <input type="date" name="date_from" class="form-control" value="{{ date_from }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">По дату</label>
+                    <input type="date" name="date_to" class="form-control" value="{{ date_to }}">
+                </div>
+                <div class="col-md-1 d-flex align-items-end">
+                    <button type="submit" class="btn btn-gradient w-100">Применить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Таблица задач -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Последние задачи</h5>
+            <span class="badge bg-secondary">Показано: {{ tasks|length }}</span>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Задача</th>
+                            <th>Статус</th>
+                            <th>Дата создания</th>
+                            <th>Дата завершения</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for task in tasks %}
+                        <tr>
+                            <td>
+                                <small title="{{ task.task_id }}">{{ task.task_id|truncatechars:12 }}</small>
+                            </td>
+                            <td>
+                                <span title="{{ task.task_name }}">{{ task.task_name|truncatechars:40 }}</span>
+                            </td>
+                            <td>
+                                {% if task.status == 'SUCCESS' %}
+                                    <span class="badge bg-success">Успешно</span>
+                                {% elif task.status == 'FAILURE' %}
+                                    <span class="badge bg-danger">Ошибка</span>
+                                {% elif task.status == 'PENDING' %}
+                                    <span class="badge bg-secondary">Ожидание</span>
+                                {% elif task.status == 'STARTED' %}
+                                    <span class="badge bg-info">Выполняется</span>
+                                {% elif task.status == 'RETRY' %}
+                                    <span class="badge bg-warning">Повтор</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ task.status }}</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ task.date_created|date:"d.m.Y H:i" }}</td>
+                            <td>
+                                {% if task.date_done %}
+                                    {{ task.date_done|date:"d.m.Y H:i" }}
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{% url 'accounts:task_result_detail' task.task_id %}" 
+                                   class="btn btn-sm btn-outline-info">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center py-4">
+                                <div class="text-muted">
+                                    <i class="fas fa-inbox fa-2x mb-2"></i>
+                                    <p>Задачи не найдены</p>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Популярные задачи -->
+    {% if popular_tasks %}
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5 class="mb-0">Статистика по задачам</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Задача</th>
+                            <th>Всего</th>
+                            <th>Успешно</th>
+                            <th>С ошибкой</th>
+                            <th>Успешность</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for task in popular_tasks %}
+                        <tr>
+                            <td title="{{ task.task_name }}">{{ task.task_name|truncatechars:50 }}</td>
+                            <td>{{ task.count }}</td>
+                            <td class="text-success">{{ task.success }}</td>
+                            <td class="text-danger">{{ task.failure }}</td>
+                            <td>
+                                <div class="progress" style="height: 20px;">
+                                    {% if task.count > 0 %}
+                                    <div class="progress-bar bg-success" 
+                                         style="width: {% widthratio task.success task.count 100 %}%">
+                                        {% widthratio task.success task.count 100 %}%
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

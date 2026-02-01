@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Ежедневная статистика</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        .stats-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        .stats-table th, .stats-table td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        .stats-table th { background-color: #f4f4f4; }
+        .positive { color: green; font-weight: bold; }
+        .header { background: linear-gradient(135deg, #E53935, #FF8C00); color: white; padding: 20px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Ежедневная статистика EVERON</h1>
+        <h2>{{ date }}</h2>
+    </div>
+
+    <div style="padding: 20px;">
+        <h3>Статистика пользователей:</h3>
+        <table class="stats-table">
+            <tr>
+                <th>Показатель</th>
+                <th>Значение</th>
+            </tr>
+            <tr>
+                <td>Всего пользователей</td>
+                <td>{{ total_users }}</td>
+            </tr>
+            <tr>
+                <td>Новых пользователей за сегодня</td>
+                <td class="positive">+{{ new_users_today }}</td>
+            </tr>
+            <tr>
+                <td>Пользователей с подтвержденным email</td>
+                <td>{{ verified_users }}</td>
+            </tr>
+            <tr>
+                <td>Процент верификации</td>
+                <td>{{ verification_rate|floatformat:1 }}%</td>
+            </tr>
+        </table>
+
+        <p><strong>Время генерации отчета:</strong> {% now "H:i" %}</p>
+    </div>
+</body>
+</html>

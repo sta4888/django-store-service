@@ -1,62 +1,98 @@
-version: '3.8'
+version: "3.8"
 
 services:
-  # PostgreSQL база данных
-  postgres:
-    image: postgres:16-alpine
-    container_name: django_store_postgres
-    env_file:
-      - .env
-    ports:
-      - "5433:5432"
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql  # если нужны начальные данные
+      - redis_data:/data
+    ports:
+      - "6379:6379"
     networks:
-      - django_network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - backend
 
-  # pgAdmin для управления БД
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: django_store_pgadmin
+  web:
+    build: .
+    command: >
+      sh -c "
+      uv run python manage.py migrate &&
+      uv run gunicorn core.wsgi:application --bind 0.0.0.0:8000
+      "
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./db.sqlite3:/app/db.sqlite3
     env_file:
       - .env
-    ports:
-      - "5050:80"
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
+    environment:
+      DATABASE_URL: sqlite:///db.sqlite3
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
     networks:
-      - django_network
+      backend:
+      gnet:
+        aliases:
+          - web
+
+  celery:
+    build: .
+    command: uv run celery -A core worker -l info
+    volumes:
+      - ./db.sqlite3:/app/db.sqlite3
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: sqlite:///db.sqlite3
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    restart: unless-stopped
+    networks:
+      - backend
     depends_on:
-      postgres:
-        condition: service_healthy
+      - redis
+      - web
 
-  # Django приложение (опционально, для продакшена)
-  # web:
-  #   build: .
-  #   command: python manage.py runserver 0.0.0.0:8000
-  #   volumes:
-  #     - ./src:/app/src
-  #   ports:
-  #     - "8000:8000"
-  #   environment:
-  #     - DEBUG=True
-  #     - DATABASE_URL=postgres://postgres:postgres123@postgres:5432/myproject
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #   networks:
-  #     - django_network
+  celery-beat:
+    build: .
+    command: uv run celery -A core beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    volumes:
+      - ./db.sqlite3:/app/db.sqlite3
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: sqlite:///db.sqlite3
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    restart: unless-stopped
+    networks:
+      - backend
+    depends_on:
+      - redis
+      - web
 
-volumes:
-  postgres_data:
-  pgadmin_data:
+  flower:
+    build: .
+    command: uv run celery -A core flower --port=5555
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+      - celery
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/0
+    networks:
+      - backend
+
 
 networks:
-  django_network:
+  backend:
     driver: bridge
+  gnet:
+    external: true
+    name: shared_gnet
+
+
+
+volumes:
+  redis_data:
+  sqlite_data:

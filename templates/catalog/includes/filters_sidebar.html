@@ -1,0 +1,89 @@
+<!-- Боковая панель фильтров -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">Фильтры</h5>
+    </div>
+    <div class="card-body">
+        <form method="get" id="filter-form">
+            <!-- Скрытые поля -->
+            <input type="hidden" name="page" value="1">
+
+            <!-- Цена -->
+            <div class="mb-3">
+                <label class="form-label fw-bold">Цена, сумм.</label>
+                <div class="row g-2">
+                    <div class="col">
+                        <input type="number"
+                               name="min_price"
+                               class="form-control form-control-sm"
+                               placeholder="От"
+                               value="{{ filter_form.min_price.value|default:'' }}">
+                    </div>
+                    <div class="col">
+                        <input type="number"
+                               name="max_price"
+                               class="form-control form-control-sm"
+                               placeholder="До"
+                               value="{{ filter_form.max_price.value|default:'' }}">
+                    </div>
+                </div>
+                {% if price_range and price_range.min_price %}
+                    <div class="form-text small">
+                        От {{ price_range.min_price|floatformat:0 }} до {{ price_range.max_price|floatformat:0 }} сумм.
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Наличие -->
+            <div class="mb-3">
+                <div class="form-check">
+                    <input type="checkbox"
+                           name="in_stock"
+                           class="form-check-input"
+                           id="in_stock"
+                           {% if filter_form.in_stock.value %}checked{% endif %}>
+                    <label class="form-check-label" for="in_stock">
+                        Только в наличии
+                    </label>
+                </div>
+            </div>
+
+            <!-- Категория (только для главной) -->
+            {% if 'category' in filter_form.fields %}
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Категория</label>
+                    {{ filter_form.category }}
+                </div>
+            {% endif %}
+
+            <!-- Атрибуты -->
+            {% for field in filter_form %}
+                {% if field.name|slice:":5" == "attr_" %}
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">{{ field.label }}</label>
+                        <div class="attribute-filters ms-2">
+                            {% for choice in field %}
+                                <div class="form-check">
+                                    {{ choice.tag }}
+                                    <label class="form-check-label" for="{{ choice.id_for_label }}">
+                                        {{ choice.choice_label }}
+                                    </label>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% endif %}
+            {% endfor %}
+
+            <!-- Кнопки -->
+            <div class="d-grid gap-2">
+                <button type="submit" class="btn btn-gradient btn-lg">
+                    <i class="bi bi-funnel"></i> Применить
+                </button>
+                <a href="?" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-x-circle"></i> Сбросить
+                </a>
+            </div>
+        </form>
+    </div>
+</div>

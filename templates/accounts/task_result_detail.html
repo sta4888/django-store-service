@@ -1,0 +1,129 @@
+{% extends 'base.html' %}
+
+{% block title %}Задача {{ task.task_id }}{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Информация о задаче</h4>
+                </div>
+                <div class="card-body">
+                    <table class="table">
+                        <tr>
+                            <th width="200">ID задачи:</th>
+                            <td><code>{{ task.task_id }}</code></td>
+                        </tr>
+                        <tr>
+                            <th>Название:</th>
+                            <td>{{ task.task_name }}</td>
+                        </tr>
+                        <tr>
+                            <th>Статус:</th>
+                            <td>
+                                {% if task.status == 'SUCCESS' %}
+                                    <span class="badge bg-success">Успешно</span>
+                                {% elif task.status == 'FAILURE' %}
+                                    <span class="badge bg-danger">Ошибка</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ task.status }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Дата создания:</th>
+                            <td>{{ task.date_created|date:"d.m.Y H:i:s" }}</td>
+                        </tr>
+                        <tr>
+                            <th>Дата завершения:</th>
+                            <td>
+                                {% if task.date_done %}
+                                    {{ task.date_done|date:"d.m.Y H:i:s" }}
+                                {% else %}
+                                    <span class="text-muted">Не завершена</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Worker:</th>
+                            <td>{{ task.worker|default:"—" }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Результат выполнения</h5>
+                </div>
+                <div class="card-body">
+                    {% if task.result %}
+                        <pre class="bg-light p-3" style="max-height: 400px; overflow: auto;"><code>{{ result_data|pprint }}</code></pre>
+                    {% else %}
+                        <p class="text-muted">Результат отсутствует</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Действия</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'accounts:task_results' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Назад к списку
+                        </a>
+                        
+                        <a href="{% url 'admin:django_celery_results_taskresult_change' task.id %}" 
+                           class="btn btn-outline-primary" target="_blank">
+                            <i class="fas fa-external-link-alt me-2"></i>В админке
+                        </a>
+                        
+                        {% if task.traceback %}
+                        <button class="btn btn-outline-danger" type="button" 
+                                data-bs-toggle="collapse" data-bs-target="#traceback">
+                            <i class="fas fa-bug me-2"></i>Показать ошибку
+                        </button>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Трейсбек ошибки -->
+                    {% if task.traceback %}
+                    <div class="collapse mt-3" id="traceback">
+                        <div class="card card-body">
+                            <h6>Трейсбек ошибки:</h6>
+                            <pre class="bg-danger text-white p-2" style="font-size: 0.8rem;">
+{{ task.traceback }}
+                            </pre>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Детали</h5>
+                </div>
+                <div class="card-body">
+                    <dl class="mb-0">
+                        <dt>Meta:</dt>
+                        <dd>{{ task.meta|default:"—" }}</dd>
+                        
+                        <dt class="mt-2">Args:</dt>
+                        <dd>{{ task.task_args|default:"—" }}</dd>
+                        
+                        <dt class="mt-2">Kwargs:</dt>
+                        <dd>{{ task.task_kwargs|default:"—" }}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

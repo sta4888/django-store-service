@@ -1,0 +1,52 @@
+<nav class="navbar navbar-expand-lg navbar-light fixed-top">
+    <div class="container">
+        <a class="navbar-brand" href="{% url 'catalog:index' %}">
+            <div class="logo-container">
+                <div class="logo-square">
+                    <!-- Используем статический файл -->
+                    <img src="/static/images/logo.png" alt="EVERON" style="width: 80%; height: 80%; object-fit: contain;">
+                </div>
+                <div class="logo-text">
+                    <span class="logo-main">EVERON</span>
+                    <span class="logo-sub"></span>
+                </div>
+            </div>
+        </a>
+        <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav ms-auto">
+                <li class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"
+                       href="{% url 'catalog:index' %}">
+                        <i class="fas fa-home me-1"></i> Главная
+                    </a>
+                </li>
+<!--                <li class="nav-item">-->
+<!--                    <a class="nav-link" href="catalog:index">-->
+<!--                        <i class="fas fa-shopping-cart me-1"></i> Магазин-->
+<!--                    </a>-->
+<!--                </li>-->
+<!--                &lt;!&ndash; только у авторизованных пользователей отображается  &ndash;&gt;-->
+<!--                <li class="nav-item">-->
+<!--                    <a class="nav-link" href="#">-->
+<!--                        <i class="fas fa-chart-line me-1"></i> Статистика-->
+<!--                    </a>-->
+<!--                </li>-->
+            </ul>
+            <div class="d-flex align-items-center ms-3">
+                {% if user.is_authenticated %}
+                <span class="me-3 text-muted">ID: {{ user.username }}</span>
+                <a href="{% url 'accounts:logout' %}" class="btn btn-outline-accent">
+                    <i class="fas fa-sign-out-alt me-2"></i>Выйти
+                </a>
+                {% else %}
+                <a href="{% url 'accounts:login' %}" class="btn btn-gradient">
+                    <i class="fas fa-sign-in-alt me-2"></i>Войти
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</nav>

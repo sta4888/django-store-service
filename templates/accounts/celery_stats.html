@@ -1,0 +1,150 @@
+{% extends 'base.html' %}
+
+{% block title %}Статистика Celery{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <h1 class="mb-4">Статистика выполнения задач Celery</h1>
+
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">Всего задач</h5>
+                    <h2 class="text-primary">{{ total_tasks }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">Успешно</h5>
+                    <h2 class="text-success">{{ success_tasks }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">С ошибкой</h5>
+                    <h2 class="text-danger">{{ failed_tasks }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">Период</h5>
+                    <h6>{{ start_date|date:"d.m.Y" }} - {{ end_date|date:"d.m.Y" }}</h6>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Фильтр по дате</h5>
+        </div>
+        <div class="card-body">
+            <div class="btn-group" role="group">
+                <a href="?date=today" class="btn btn-outline-primary {% if date_filter == 'today' %}active{% endif %}">Сегодня</a>
+                <a href="?date=week" class="btn btn-outline-primary {% if date_filter == 'week' %}active{% endif %}">Неделя</a>
+                <a href="?date=month" class="btn btn-outline-primary {% if date_filter == 'month' %}active{% endif %}">Месяц</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Статистика по типам задач</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Задача</th>
+                            <th>Всего</th>
+                            <th>Успешно</th>
+                            <th>С ошибкой</th>
+                            <th>Процент успеха</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for stat in task_stats %}
+                        <tr>
+                            <td>{{ stat.task_name|truncatechars:50 }}</td>
+                            <td>{{ stat.total }}</td>
+                            <td class="text-success">{{ stat.success }}</td>
+                            <td class="text-danger">{{ stat.failure }}</td>
+                            <td>
+                                {% if stat.total > 0 %}
+                                    {% widthratio stat.success stat.total 100 %}%
+                                {% else %}
+                                    0%
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Последние задачи</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Задача</th>
+                            <th>Статус</th>
+                            <th>Время выполнения</th>
+                            <th>Дата завершения</th>
+                            <th>Результат</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for task in tasks %}
+                        <tr>
+                            <td><small>{{ task.task_id|truncatechars:10 }}</small></td>
+                            <td>{{ task.task_name }}</td>
+                            <td>
+                                {% if task.status == 'SUCCESS' %}
+                                    <span class="badge bg-success">Успешно</span>
+                                {% elif task.status == 'FAILURE' %}
+                                    <span class="badge bg-danger">Ошибка</span>
+                                {% else %}
+                                    <span class="badge bg-warning">{{ task.status }}</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ task.task_args }}</td>
+                            <td>{{ task.date_done|date:"d.m.Y H:i" }}</td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-info"
+                                        data-bs-toggle="collapse"
+                                        data-bs-target="#result-{{ forloop.counter }}">
+                                    Показать
+                                </button>
+                                <div id="result-{{ forloop.counter }}" class="collapse mt-2">
+                                    <pre class="bg-light p-2"><code>{{ task.result|truncatechars:200 }}</code></pre>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center">Задачи не найдены</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ category.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-3">
+    <div class="row">
+        <!-- Левая колонка - фильтры -->
+        <div class="col-lg-3 col-md-4">
+            {% include 'catalog/includes/filters_sidebar.html' %}
+
+            <!-- Подкатегории -->
+            {% if subcategories %}
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Подкатегории</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="list-group list-group-flush">
+                            {% for child in subcategories %}
+                                <a href="{{ child.get_absolute_url }}"
+                                   class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                                    {{ child.name }}
+                                    <span class="badge bg-secondary rounded-pill">{{ child.products.count }}</span>
+                                </a>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Правая колонка - товары -->
+        <div class="col-lg-9 col-md-8">
+            <!-- Хлебные крошки -->
+            <nav aria-label="breadcrumb" class="mb-3">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'catalog:index' %}">Каталог</a></li>
+                    {% for ancestor in category.get_ancestors %}
+                        <li class="breadcrumb-item">
+                            <a href="{{ ancestor.get_absolute_url }}">{{ ancestor.name }}</a>
+                        </li>
+                    {% endfor %}
+                    <li class="breadcrumb-item active">{{ category.name }}</li>
+                </ol>
+            </nav>
+
+            <h1 class="mb-3">{{ category.name }}</h1>
+
+            {% if category.description %}
+                <div class="alert alert-light mb-4">
+                    {{ category.description }}
+                </div>
+            {% endif %}
+
+            <!-- Верхняя панель фильтров -->
+            {% include 'catalog/includes/filters_topbar.html' %}
+
+            <!-- Товары -->
+            {% if products %}
+                <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-3">
+                    {% for product in products %}
+                        <div class="col">
+                            <div class="card h-100 product-card shadow-sm">
+                                <div class="card-body">
+                                    <div class="position-relative">
+                                        {% if product.has_discount %}
+                                            <span class="badge bg-danger position-absolute top-0 end-0 m-2">
+                                                -{{ product.discount_percent }}%
+                                            </span>
+                                        {% endif %}
+
+                                        <h5 class="card-title">
+                                            <a href="{{ product.get_absolute_url }}" class="text-decoration-none text-dark">
+                                                {{ product.name|truncatechars:50 }}
+                                            </a>
+                                        </h5>
+
+                                        <p class="card-text small text-muted">
+                                            {{ product.short_description|truncatechars:100 }}
+                                        </p>
+                                    </div>
+
+                                    <div class="mb-2">
+                                        {% if product.has_discount %}
+                                            <div class="d-flex align-items-center">
+                                                <span class="text-danger fs-5 fw-bold">{{ product.price }} сумм.</span>
+                                                <small class="text-muted text-decoration-line-through ms-2">
+                                                    {{ product.old_price }} сумм.
+                                                </small>
+                                            </div>
+                                        {% else %}
+                                            <span class="fs-5 fw-bold">{{ product.price }} сумм.</span>
+                                        {% endif %}
+                                    </div>
+
+                                    <div class="mb-3">
+                                        {% if product.in_stock %}
+                                            <span class="badge bg-success">В наличии</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Нет в наличии</span>
+                                        {% endif %}
+                                    </div>
+
+                                    <div class="d-grid gap-2">
+                                        <a href="{{ product.get_absolute_url }}" class="btn btn-outline-primary btn-gradient btn-sm">
+                                            <i class="bi bi-eye"></i> Подробнее
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Пагинация -->
+                {% include 'catalog/includes/pagination.html' %}
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-search display-1 text-muted"></i>
+                    <h3 class="mt-3">Товары не найдены</h3>
+                    <p class="text-muted">Попробуйте изменить параметры фильтрации</p>
+                    <a href="?" class="btn btn-primary">Сбросить фильтры</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

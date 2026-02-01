@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+
+{% block title %}Вход в личный кабинет{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-lg border-0">
+                <div class="card-body p-5">
+                    <div class="text-center mb-5">
+                        <div class="logo-square mx-auto mb-3">
+                            <span>EV</span>
+                        </div>
+                        <h2 class="fw-bold">Вход в личный кабинет</h2>
+                        <p class="text-muted">Введите ваш ID и пароль</p>
+                    </div>
+
+                    {% if messages %}
+                    <div class="mb-4">
+                        {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+
+                        <div class="mb-4">
+                            <label class="form-label">
+                                <i class="fas fa-user me-2"></i>ID пользователя
+                            </label>
+                            <input type="text"
+                                   name="username"
+                                   class="form-control"
+                                   placeholder="Введите ваш ID (например: 00000001)"
+                                   required
+                                   autofocus>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label">
+                                <i class="fas fa-lock me-2"></i>Пароль
+                            </label>
+                            <input type="password"
+                                   name="password"
+                                   class="form-control"
+                                   placeholder="Пароль"
+                                   required>
+                        </div>
+
+                        <div class="d-grid mb-4">
+                            <button type="submit" class="btn btn-gradient btn-lg">
+                                <i class="fas fa-sign-in-alt me-2"></i>Войти
+                            </button>
+                        </div>
+
+                        <div class="text-center">
+                            <p class="mb-0 text-muted">
+                                Регистрация возможна только по реферальной ссылке
+                            </p>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
