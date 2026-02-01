@@ -4,6 +4,7 @@ import logging
 import requests
 from django.core.cache import cache
 
+from core.settings import FASTAPI_SERVICE_URL
 from .tasks import update_user_stats_cache
 from django.http import JsonResponse
 from django.shortcuts import render
@@ -19,13 +20,14 @@ logger = logging.getLogger(__name__)
 
 @login_required
 def dashboard_view(request):
-    user_id = request.user.username
-    cache_key = f"user:stats:{user_id}"
-    stats = cache.get(cache_key)  # быстрое чтение, не блокирующее
-
-    if stats is None:
-        # стартуем фоновую задачу, но не ждём её результата
-        update_user_stats_cache.delay(user_id)
+    stats = {}
+    # user_id = request.user.username
+    # cache_key = f"user:stats:{user_id}"
+    # stats = cache.get(cache_key)  # быстрое чтение, не блокирующее
+    #
+    # if stats is None:
+    #     # стартуем фоновую задачу, но не ждём её результата
+    #     update_user_stats_cache.delay(user_id)
 
     return render(
         request,
@@ -103,9 +105,10 @@ def get_stats_json(request):
 
 @login_required
 def get_user_data(request):
+    user_id = request.user.username
     try:
         r = requests.get(
-            "http://45.130.148.158:8001/user/users/00000009/status",
+            f"{FASTAPI_SERVICE_URL}/user/users/{user_id}/status",
             timeout=5
         )
         r.raise_for_status()
