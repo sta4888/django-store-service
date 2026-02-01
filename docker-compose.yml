@@ -17,10 +17,12 @@ services:
       sh -c "
       uv run python manage.py migrate &&
       uv run gunicorn core.wsgi:application --bind 0.0.0.0:8000
+      --reload
       "
     ports:
       - "8000:8000"
     volumes:
+      - .:/app
       - ./db.sqlite3:/app/db.sqlite3
     env_file:
       - .env
