@@ -20,14 +20,15 @@ logger = logging.getLogger(__name__)
 @login_required
 def dashboard_view(request):
     user_id = request.user.username
-    cache_key = f"user:stats:{user_id}"
-
-    stats = cache.get(cache_key)
-    logger.debug(f"stats: {stats}")
-    logger.debug(f"cache_key: {cache_key}")
-
-    if stats is None:
-        update_user_stats_cache.delay(user_id)
+    stats = {}
+    # cache_key = f"user:stats:{user_id}"
+    #
+    # stats = cache.get(cache_key)
+    # logger.debug(f"stats: {stats}")
+    # logger.debug(f"cache_key: {cache_key}")
+    #
+    # if stats is None:
+    #     update_user_stats_cache.delay(user_id)
 
     return render(
         request,
