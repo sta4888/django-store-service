@@ -247,4 +247,4 @@ def get_user_team(request):
 @login_required
 def api_test_page(request):
     """Страница для тестирования API"""
-    return render(request, 'admin_api.html')
+    return render(request, 'cabinet/admin_api.html')
