@@ -101,7 +101,6 @@ networks:
   backend:
     driver: bridge
 
-
 volumes:
   redis_data:
   sqlite_data:
