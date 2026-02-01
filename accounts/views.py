@@ -91,7 +91,6 @@ def verify_email_view(request):
             user.email_verification_sent_at = None
             user.save()
 
-            # fixme потом поправим на celery или перенесем на кафку или тп...
             service = FastAPIService()
             referrer_id = user.referrer.username if user.referrer else None
             data = service.add_user(user_id=user.username, referrer_id=referrer_id)
