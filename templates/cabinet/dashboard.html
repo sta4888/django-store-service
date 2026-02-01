@@ -307,7 +307,7 @@ document.addEventListener('DOMContentLoaded', function() {
             lastUpdated.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Обновление...';
         }
 
-        fetch('api/get-stats/')
+        fetch('api/get-data/')
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {

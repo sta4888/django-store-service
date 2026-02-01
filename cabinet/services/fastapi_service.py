@@ -4,12 +4,14 @@ from django.conf import settings
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+from core.settings import FASTAPI_SERVICE_URL
+
 logger = logging.getLogger(__name__)
 
 
 class FastAPIService:
     def __init__(self):
-        self.base_url = settings.FASTAPI_SERVICE_URL.rstrip("/")
+        self.base_url = FASTAPI_SERVICE_URL.rstrip("/")
         self.session = self._create_session()
 
     def _create_session(self):
