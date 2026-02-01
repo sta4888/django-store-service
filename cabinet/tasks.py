@@ -57,7 +57,7 @@ CACHE_TTL = 300
     retry_backoff=10,
     retry_kwargs={"max_retries": 5},
 )
-def update_user_stats_cache(self, user_id: int):
+def update_user_stats_cache(user_id: int):
     service = FastAPIService()
 
     data = service.get_user_stats(user_id)
