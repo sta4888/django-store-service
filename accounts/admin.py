@@ -22,7 +22,7 @@ class CustomUserAdmin(UserAdmin):
         ('Статистика', {'fields': ('personal_volume', 'group_volume', 'earnings',
                                    'available_for_withdrawal', 'partner_level',
                                    'total_referrals', 'active_referrals')}),
-        ('Разрешения', {'fields': ('is_active', 'is_staff', 'is_superuser',
+        ('Разрешения', {'fields': ('user_type', 'is_active', 'is_staff', 'is_superuser',
                                    'groups', 'user_permissions')}),
         ('Важные даты', {'fields': ('last_login', 'date_joined', 'registration_date')}),
     )
