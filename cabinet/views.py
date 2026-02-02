@@ -6,7 +6,7 @@ from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 
 from core.settings import FASTAPI_SERVICE_URL
-from .tasks import update_user_stats_cache
+# from .tasks import update_user_stats_cache
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
@@ -56,52 +56,52 @@ def finance_view(request):
     return render(request, 'cabinet/finance.html')
 
 
-@login_required
-def refresh_stats(request):
-    """Обновление статистики по AJAX запросу"""
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            force_refresh = data.get('force', False)
-        except:
-            force_refresh = False
-
-    service = FastAPIService()
-    user_stats = service.get_user_stats(request.user.username, force_refresh=force_refresh)
-
-    if user_stats is None:
-        # Запускаем асинхронное обновление
-        task = update_user_stats_cache.delay(request.user.username)
-        return JsonResponse({
-            'status': 'updating',
-            'message': 'Данные обновляются...',
-            'task_id': str(task.id)
-        })
-
-    return JsonResponse({
-        'status': 'success',
-        'data': user_stats,
-        'refreshed': True
-    })
-
-
-@login_required
-def get_stats_json(request):
-    user_id = request.user.username
-    cache_key = f"user:stats:{user_id}"
-
-    stats = cache.get(cache_key)
-
-    if not stats:
-        update_user_stats_cache.delay(user_id)
-        return JsonResponse(
-            {"status": "loading"},
-            status=202
-        )
-
-    return JsonResponse(
-        {"status": "ok", "data": stats}
-    )
+# @login_required
+# def refresh_stats(request):
+#     """Обновление статистики по AJAX запросу"""
+#     if request.method == 'POST':
+#         try:
+#             data = json.loads(request.body)
+#             force_refresh = data.get('force', False)
+#         except:
+#             force_refresh = False
+#
+#     service = FastAPIService()
+#     user_stats = service.get_user_stats(request.user.username, force_refresh=force_refresh)
+#
+#     if user_stats is None:
+#         # Запускаем асинхронное обновление
+#         task = update_user_stats_cache.delay(request.user.username)
+#         return JsonResponse({
+#             'status': 'updating',
+#             'message': 'Данные обновляются...',
+#             'task_id': str(task.id)
+#         })
+#
+#     return JsonResponse({
+#         'status': 'success',
+#         'data': user_stats,
+#         'refreshed': True
+#     })
+#
+#
+# @login_required
+# def get_stats_json(request):
+#     user_id = request.user.username
+#     cache_key = f"user:stats:{user_id}"
+#
+#     stats = cache.get(cache_key)
+#
+#     if not stats:
+#         update_user_stats_cache.delay(user_id)
+#         return JsonResponse(
+#             {"status": "loading"},
+#             status=202
+#         )
+#
+#     return JsonResponse(
+#         {"status": "ok", "data": stats}
+#     )
 
 
 @login_required
@@ -121,8 +121,6 @@ def get_user_data(request):
 
     return JsonResponse(r.json(), safe=False)
 
-
-import json
 
 
 @login_required
