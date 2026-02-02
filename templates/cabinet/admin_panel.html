@@ -1,0 +1,758 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row">
+        <!-- Боковое меню -->
+        <div class="col-lg-3 mb-4">
+            {% include 'includes/sidebar.html' %}
+        </div>
+
+        <!-- Основная информация -->
+        <div class="col-lg-9">
+            <!-- Заголовок -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1><i class="fas fa-cog me-2"></i>Администрирование</h1>
+                <div class="text-end">
+                    <div class="text-muted small">ID: {{ user.username }}</div>
+                    <div class="badge bg-info">
+                        {% if user.is_store %}
+                        <i class="fas fa-store me-1"></i> Магазин
+                        {% else %}
+                        <i class="fas fa-user-tie me-1"></i> Администратор
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Вкладки -->
+            <ul class="nav nav-tabs mb-4" id="adminTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="manage-lo-tab" data-bs-toggle="tab" data-bs-target="#manage-lo" type="button">
+                        <i class="fas fa-exchange-alt me-1"></i>Управление LO
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="user-status-tab" data-bs-toggle="tab" data-bs-target="#user-status" type="button">
+                        <i class="fas fa-info-circle me-1"></i>Статус пользователя
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="structure-tab" data-bs-toggle="tab" data-bs-target="#structure" type="button">
+                        <i class="fas fa-sitemap me-1"></i>Структура
+                    </button>
+                </li>
+            </ul>
+
+            <!-- Содержимое вкладок -->
+            <div class="tab-content" id="adminTabsContent">
+                
+                <!-- Вкладка Управление LO -->
+                <div class="tab-pane fade show active" id="manage-lo" role="tabpanel">
+                    <div class="row">
+                        <!-- Форма добавления LO -->
+                        <div class="col-md-6 mb-4">
+                            <div class="card h-100">
+                                <div class="card-header bg-success text-white">
+                                    <h5 class="mb-0"><i class="fas fa-plus-circle me-2"></i>Добавить LO</h5>
+                                </div>
+                                <div class="card-body">
+                                    <form id="addLoForm">
+                                        {% csrf_token %}
+                                        <div class="mb-3">
+                                            <label class="form-label">ID пользователя</label>
+                                            <input type="text" class="form-control" name="user_id" 
+                                                   placeholder="Например: 00000008" required>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Сумма LO</label>
+                                            <input type="number" class="form-control" name="lo" 
+                                                   placeholder="Введите сумму" step="0.01" min="0.01" required>
+                                        </div>
+                                        <button type="submit" class="btn btn-success w-100">
+                                            <i class="fas fa-plus-circle me-2"></i>Добавить LO
+                                        </button>
+                                    </form>
+                                    
+                                    <div class="mt-3" id="addLoResult"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Форма вычитания LO -->
+                        <div class="col-md-6 mb-4">
+                            <div class="card h-100">
+                                <div class="card-header bg-danger text-white">
+                                    <h5 class="mb-0"><i class="fas fa-minus-circle me-2"></i>Вычесть LO</h5>
+                                </div>
+                                <div class="card-body">
+                                    <form id="subtractLoForm">
+                                        {% csrf_token %}
+                                        <div class="mb-3">
+                                            <label class="form-label">ID пользователя</label>
+                                            <input type="text" class="form-control" name="user_id" 
+                                                   placeholder="Например: 00000008" required>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Сумма LO</label>
+                                            <input type="number" class="form-control" name="lo" 
+                                                   placeholder="Введите сумму" step="0.01" min="0.01" required>
+                                        </div>
+                                        <button type="submit" class="btn btn-danger w-100">
+                                            <i class="fas fa-minus-circle me-2"></i>Вычесть LO
+                                        </button>
+                                    </form>
+                                    
+                                    <div class="mt-3" id="subtractLoResult"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- История операций -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-history me-2"></i>История операций</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover" id="loHistory">
+                                    <thead>
+                                        <tr>
+                                            <th>Время</th>
+                                            <th>Пользователь</th>
+                                            <th>Операция</th>
+                                            <th>Сумма</th>
+                                            <th>Статус</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td colspan="5" class="text-center text-muted py-4">
+                                                Нет операций
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Вкладка Статус пользователя -->
+                <div class="tab-pane fade" id="user-status" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-user-circle me-2"></i>Проверка статуса пользователя</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-4">
+                                <div class="col-md-8">
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="statusUserId" 
+                                               placeholder="ID пользователя" value="00000008">
+                                        <button class="btn btn-gradient" onclick="getUserStatus()">
+                                            <i class="fas fa-search me-2"></i>Получить статус
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div id="statusResult">
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    Введите ID пользователя и нажмите "Получить статус"
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Вкладка Структура -->
+                <div class="tab-pane fade" id="structure" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-sitemap me-2"></i>Структура пользователя</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-4">
+                                <div class="col-md-8">
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="structureUserId" 
+                                               placeholder="ID пользователя" value="00000006">
+                                        <button class="btn btn-gradient" onclick="getUserStructure()">
+                                            <i class="fas fa-project-diagram me-2"></i>Получить структуру
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div id="structureResult">
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    Введите ID пользователя и нажмите "Получить структуру"
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const CSRF_TOKEN = "{{ csrf_token }}";
+
+// Функции для работы с LO
+document.addEventListener('DOMContentLoaded', function() {
+    // Форма добавления LO
+    const addLoForm = document.getElementById('addLoForm');
+    if (addLoForm) {
+        addLoForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const userId = formData.get('user_id');
+            const loAmount = formData.get('lo');
+            
+            const resultDiv = document.getElementById('addLoResult');
+            resultDiv.innerHTML = `
+                <div class="alert alert-info">
+                    <i class="fas fa-spinner fa-spin me-2"></i>
+                    Добавление ${loAmount} LO пользователю ${userId}...
+                </div>
+            `;
+            
+            try {
+                const response = await fetch(`/cabinet/api/lo/add/${userId}/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+                    },
+                    body: JSON.stringify({ lo: parseFloat(loAmount) })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle me-2"></i>
+                            Успешно добавлено ${loAmount} LO пользователю ${userId}
+                        </div>
+                    `;
+                    
+                    // Очищаем форму
+                    this.reset();
+                    
+                    // Добавляем в историю
+                    addToHistory({
+                        timestamp: new Date().toLocaleString('ru-RU'),
+                        user_id: userId,
+                        type: 'add',
+                        amount: loAmount
+                    });
+                    
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-danger">
+                            <i class="fas fa-times-circle me-2"></i>
+                            Ошибка: ${data.error || 'Неизвестная ошибка'}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-times-circle me-2"></i>
+                        Ошибка сети: ${error.message}
+                    </div>
+                `;
+            }
+        });
+    }
+    
+    // Форма вычитания LO
+    const subtractLoForm = document.getElementById('subtractLoForm');
+    if (subtractLoForm) {
+        subtractLoForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const userId = formData.get('user_id');
+            const loAmount = formData.get('lo');
+            
+            if (!confirm(`Вы уверены, что хотите вычесть ${loAmount} LO у пользователя ${userId}?`)) {
+                return;
+            }
+            
+            const resultDiv = document.getElementById('subtractLoResult');
+            resultDiv.innerHTML = `
+                <div class="alert alert-info">
+                    <i class="fas fa-spinner fa-spin me-2"></i>
+                    Вычитание ${loAmount} LO у пользователя ${userId}...
+                </div>
+            `;
+            
+            try {
+                const response = await fetch(`/cabinet/api/lo/subtract/${userId}/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+                    },
+                    body: JSON.stringify({ lo: parseFloat(loAmount) })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle me-2"></i>
+                            Успешно вычтено ${loAmount} LO у пользователя ${userId}
+                        </div>
+                    `;
+                    
+                    // Очищаем форму
+                    this.reset();
+                    
+                    // Добавляем в историю
+                    addToHistory({
+                        timestamp: new Date().toLocaleString('ru-RU'),
+                        user_id: userId,
+                        type: 'subtract',
+                        amount: loAmount
+                    });
+                    
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-danger">
+                            <i class="fas fa-times-circle me-2"></i>
+                            Ошибка: ${data.error || 'Неизвестная ошибка'}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-times-circle me-2"></i>
+                        Ошибка сети: ${error.message}
+                    </div>
+                `;
+            }
+        });
+    }
+    
+    // Загружаем историю при загрузке страницы
+    loadLOHistory();
+});
+
+function addToHistory(operation) {
+    const table = document.querySelector('#loHistory tbody');
+    
+    // Если таблица пустая (содержит placeholder)
+    if (table.rows.length === 1 && table.rows[0].cells[0].colSpan) {
+        table.innerHTML = '';
+    }
+    
+    const row = document.createElement('tr');
+    const typeClass = operation.type === 'add' ? 'success' : 'danger';
+    const typeText = operation.type === 'add' ? 'Добавление' : 'Вычитание';
+    
+    row.innerHTML = `
+        <td>${operation.timestamp}</td>
+        <td><strong>${operation.user_id}</strong></td>
+        <td>
+            <span class="badge bg-${typeClass}">
+                ${typeText}
+            </span>
+        </td>
+        <td><span class="fw-bold">${operation.amount} бал</span></td>
+        <td><span class="badge bg-success">Успешно</span></td>
+    `;
+    
+    table.insertBefore(row, table.firstChild);
+    
+    // Сохраняем в localStorage
+    saveToLocalStorage(operation);
+}
+
+function loadLOHistory() {
+    // Загружаем из localStorage
+    const history = JSON.parse(localStorage.getItem('loOperations') || '[]');
+    const table = document.querySelector('#loHistory tbody');
+    
+    if (history.length === 0) {
+        table.innerHTML = `
+            <tr>
+                <td colspan="5" class="text-center text-muted py-4">
+                    Нет сохраненных операций
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    let html = '';
+    history.slice(0, 10).forEach(op => {
+        const typeClass = op.type === 'add' ? 'success' : 'danger';
+        const typeText = op.type === 'add' ? 'Добавление' : 'Вычитание';
+        
+        html += `
+        <tr>
+            <td>${op.timestamp}</td>
+            <td><strong>${op.user_id}</strong></td>
+            <td>
+                <span class="badge bg-${typeClass}">
+                    ${typeText}
+                </span>
+            </td>
+            <td><span class="fw-bold">${op.amount} бал</span></td>
+            <td><span class="badge bg-success">Успешно</span></td>
+        </tr>
+        `;
+    });
+    
+    table.innerHTML = html;
+}
+
+function saveToLocalStorage(operation) {
+    let history = JSON.parse(localStorage.getItem('loOperations') || '[]');
+    history.unshift(operation);
+    
+    // Храним только последние 50 операций
+    if (history.length > 50) {
+        history = history.slice(0, 50);
+    }
+    
+    localStorage.setItem('loOperations', JSON.stringify(history));
+}
+
+// Функции для получения статуса и структуры
+async function getUserStatus() {
+    const userId = document.getElementById('statusUserId').value.trim();
+    const resultDiv = document.getElementById('statusResult');
+    
+    if (!userId) {
+        showAlert(resultDiv, 'warning', 'Пожалуйста, введите ID пользователя');
+        return;
+    }
+    
+    showAlert(resultDiv, 'info', `Загрузка статуса пользователя ${userId}...`, true);
+    
+    try {
+        const response = await fetch(`/cabinet/api/user/${userId}/status/`);
+        const data = await response.json();
+        
+        if (response.ok) {
+            let html = `
+                <div class="card">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0"><i class="fas fa-user me-2"></i>Статус пользователя</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <table class="table table-sm">
+                                    <tr>
+                                        <th><i class="fas fa-id-card me-2"></i>ID:</th>
+                                        <td><strong>${data.user_id || userId}</strong></td>
+                                    </tr>
+                                    <tr>
+                                        <th><i class="fas fa-chart-line me-2"></i>LO:</th>
+                                        <td><span class="badge bg-primary">${data.lo || 0} бал</span></td>
+                                    </tr>
+                                    <tr>
+                                        <th><i class="fas fa-users me-2"></i>GO:</th>
+                                        <td><span class="badge bg-info">${data.go || 0} бал</span></td>
+                                    </tr>
+                                    <tr>
+                                        <th><i class="fas fa-star me-2"></i>Статус:</th>
+                                        <td>${data.status || '-'}</td>
+                                    </tr>
+                                </table>
+                            </div>
+                            <div class="col-md-6">
+                                <table class="table table-sm">
+                                    <tr>
+                                        <th><i class="fas fa-coins me-2"></i>Баллы:</th>
+                                        <td>${data.points || 0}</td>
+                                    </tr>
+                                    <tr>
+                                        <th><i class="fas fa-wallet me-2"></i>Общий доход:</th>
+                                        <td><strong>${data.total_income || 0} сум</strong></td>
+                                    </tr>
+                                    <tr>
+                                        <th><i class="fas fa-money-bill-wave me-2"></i>Доступно:</th>
+                                        <td><span class="badge bg-success">${data.personal_money || 0} сум</span></td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            resultDiv.innerHTML = html;
+            
+        } else {
+            showAlert(resultDiv, 'error', `Ошибка: ${data.error || 'Не удалось получить статус'}`);
+        }
+        
+    } catch (error) {
+        showAlert(resultDiv, 'error', `Ошибка сети: ${error.message}`);
+    }
+}
+
+async function getUserStructure() {
+    const userId = document.getElementById('structureUserId').value.trim();
+    const resultDiv = document.getElementById('structureResult');
+    
+    if (!userId) {
+        showAlert(resultDiv, 'warning', 'Пожалуйста, введите ID пользователя');
+        return;
+    }
+    
+    showAlert(resultDiv, 'info', `Загрузка структуры пользователя ${userId}...`, true);
+    
+    try {
+        const response = await fetch(`/cabinet/api/user/${userId}/structure/`);
+        const data = await response.json();
+        
+        if (response.ok) {
+            if (data.children && data.children.length > 0) {
+                let html = `
+                    <div class="tree-structure mb-4">
+                        <ul class="tree">
+                            <li>
+                                <div class="tree-node">
+                                    <span class="node-main">
+                                        <i class="fas fa-user-circle me-2"></i>
+                                        <strong>${userId}</strong>
+                                        <span class="badge bg-info ms-2">Корень</span>
+                                    </span>
+                                    ${data.lo ? `<span class="node-lo">LO: ${data.lo}</span>` : ''}
+                                </div>
+                `;
+                
+                html += buildTreeHTML(data.children, 1);
+                html += `
+                            </li>
+                        </ul>
+                    </div>
+                    
+                    <div class="row text-center">
+                        <div class="col-md-3">
+                            <div class="stat-card-sm">
+                                <div class="stat-label-sm">Всего в структуре</div>
+                                <div class="stat-value-sm">${countTotalChildren(data.children)}</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stat-card-sm">
+                                <div class="stat-label-sm">Уровней</div>
+                                <div class="stat-value-sm">${countLevels(data.children)}</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stat-card-sm">
+                                <div class="stat-label-sm">Прямых рефералов</div>
+                                <div class="stat-value-sm">${data.children.length}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                resultDiv.innerHTML = html;
+                
+            } else {
+                showAlert(resultDiv, 'info', `У пользователя ${userId} нет рефералов в структуре`);
+            }
+            
+        } else {
+            showAlert(resultDiv, 'error', `Ошибка: ${data.error || 'Не удалось получить структуру'}`);
+        }
+        
+    } catch (error) {
+        showAlert(resultDiv, 'error', `Ошибка сети: ${error.message}`);
+    }
+}
+
+// Вспомогательные функции для дерева
+function buildTreeHTML(children, level) {
+    if (!children || children.length === 0) return '';
+    
+    let html = '<ul>';
+    children.forEach(child => {
+        html += `
+            <li>
+                <div class="tree-node">
+                    <span class="node-main">
+                        <i class="fas fa-user me-2"></i>
+                        ${child.user_id}
+                        <span class="badge bg-secondary ms-2">Уровень ${level}</span>
+                    </span>
+                    ${child.lo ? `<span class="node-lo">LO: ${child.lo}</span>` : ''}
+                </div>
+        `;
+        
+        if (child.children && child.children.length > 0) {
+            html += buildTreeHTML(child.children, level + 1);
+        }
+        
+        html += '</li>';
+    });
+    html += '</ul>';
+    return html;
+}
+
+function countTotalChildren(children) {
+    if (!children) return 0;
+    let count = children.length;
+    children.forEach(child => {
+        if (child.children) {
+            count += countTotalChildren(child.children);
+        }
+    });
+    return count;
+}
+
+function countLevels(children) {
+    if (!children || children.length === 0) return 0;
+    let maxLevel = 0;
+    children.forEach(child => {
+        if (child.children && child.children.length > 0) {
+            const childLevels = 1 + countLevels(child.children);
+            if (childLevels > maxLevel) maxLevel = childLevels;
+        } else {
+            if (1 > maxLevel) maxLevel = 1;
+        }
+    });
+    return maxLevel;
+}
+
+// Функция для показа уведомлений
+function showAlert(element, type, message, loading = false) {
+    let alertClass = 'alert-info';
+    let icon = 'fa-info-circle';
+    
+    if (type === 'success') {
+        alertClass = 'alert-success';
+        icon = 'fa-check-circle';
+    } else if (type === 'error') {
+        alertClass = 'alert-danger';
+        icon = 'fa-times-circle';
+    } else if (type === 'warning') {
+        alertClass = 'alert-warning';
+        icon = 'fa-exclamation-triangle';
+    }
+    
+    if (loading) {
+        element.innerHTML = `
+            <div class="alert alert-info">
+                <i class="fas fa-spinner fa-spin me-2"></i>
+                ${message}
+            </div>
+        `;
+    } else {
+        element.innerHTML = `
+            <div class="alert ${alertClass}">
+                <i class="fas ${icon} me-2"></i>
+                ${message}
+            </div>
+        `;
+    }
+}
+</script>
+
+<style>
+.nav-tabs .nav-link {
+    font-weight: 500;
+}
+
+.nav-tabs .nav-link.active {
+    border-color: var(--color-red) var(--color-red) #fff;
+    border-bottom: 3px solid var(--color-red);
+    color: var(--color-red);
+    font-weight: 600;
+}
+
+.tree-structure {
+    max-height: 500px;
+    overflow-y: auto;
+    padding: 15px;
+    background: var(--color-light);
+    border-radius: 8px;
+}
+
+.tree {
+    list-style: none;
+    padding-left: 0;
+}
+
+.tree ul {
+    padding-left: 25px;
+    border-left: 2px dashed var(--color-gray-300);
+    margin-left: 15px;
+}
+
+.tree li {
+    margin: 12px 0;
+    position: relative;
+}
+
+.tree-node {
+    padding: 10px 15px;
+    background: white;
+    border: 1px solid var(--color-gray-200);
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.tree-node:hover {
+    border-color: var(--color-red);
+    box-shadow: 0 4px 8px rgba(229, 57, 53, 0.1);
+}
+
+.node-main {
+    font-weight: 500;
+    color: var(--color-gray-800);
+}
+
+.node-lo {
+    background: var(--color-red-soft);
+    color: var(--color-red);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.stat-card-sm {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+    border: 1px solid var(--color-gray-200);
+}
+
+.stat-label-sm {
+    font-size: 0.8rem;
+    color: var(--color-gray-600);
+    margin-bottom: 5px;
+}
+
+.stat-value-sm {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--color-red);
+}
+</style>
+{% endblock %}

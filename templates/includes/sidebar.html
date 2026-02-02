@@ -1,0 +1,42 @@
+<div class="sidebar">
+    <div class="sidebar-header">
+        <div class="user-info">
+            <div class="user-avatar">
+                {% if user.first_name %}
+                {{ user.first_name|first|upper }}{{ user.last_name|first|upper }}
+                {% else %}
+                {{ user.username|first|upper }}
+                {% endif %}
+            </div>
+            <div>
+                <div class="user-name">
+                    {{ user.get_full_name|default:user.username }}
+                </div>
+                <div class="user-status">{% if user.is_store %}Магазин{% else %}Партнер{% endif %}</div>
+                <span class="status-badge">{{ user.partner_level }}</span>
+            </div>
+        </div>
+    </div>
+
+    <ul class="sidebar-menu">
+        <li><a href="{% url 'cabinet:dashboard' %}"
+               class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+            <i class="fas fa-tachometer-alt"></i> Главная ЛК</a>
+        </li>
+
+        {% if user.is_store or user.is_staff %}
+        <li><a href="{% url 'cabinet:admin_panel' %}"
+               class="{% if request.resolver_match.url_name == 'admin_panel' %}active{% endif %}">
+            <i class="fas fa-cog"></i> Администрирование</a>
+        </li>
+        {% endif %}
+
+        <li><a href="#"><i class="fas fa-link"></i> Реферальная ссылка</a></li>
+        <li><a href="#"><i class="fas fa-user-plus"></i> Регистрация пользователя</a></li>
+        <li><a href="#"><i class="fas fa-sitemap"></i> Моя структура</a></li>
+        <li><a href="#"><i class="fas fa-shopping-bag"></i> Мои покупки</a></li>
+        <li><a href="#"><i class="fas fa-newspaper"></i> Новости компании</a></li>
+        <li><a href="#"><i class="fas fa-wallet"></i> Финансы</a></li>
+        <li><a href="#"><i class="fas fa-cog"></i> Настройки</a></li>
+    </ul>
+</div>

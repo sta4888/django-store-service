@@ -127,6 +127,27 @@ class CustomUser(AbstractUser):
         verbose_name='Активных рефералов'
     )
 
+    USER_TYPE_CHOICES = (
+        ('partner', 'Партнер'),
+        ('store', 'Магазин/Продавец'),
+    )
+    user_type = models.CharField(
+        max_length=10,
+        choices=USER_TYPE_CHOICES,
+        default='partner',
+        verbose_name='Тип пользователя'
+    )
+
+    @property
+    def is_store(self):
+        """Проверяет, является ли пользователь магазином/продавцом"""
+        return self.user_type == 'store'
+
+    @property
+    def can_access_admin(self):
+        """Проверяет, есть ли у пользователя доступ к админке"""
+        return self.is_store or self.is_staff or self.is_superuser
+
     def save(self, *args, **kwargs):
         if not self.user_id:
             # Генерация ID в формате 00000001

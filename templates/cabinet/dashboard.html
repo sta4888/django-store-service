@@ -6,46 +6,8 @@
     <div class="row">
         <!-- Боковое меню -->
         <div class="col-lg-3 mb-4">
-            <div class="sidebar">
-                <div class="sidebar-header">
-                    <div class="user-info">
-                        <div class="user-avatar">
-                            {% if user.first_name %}
-                            {{ user.first_name|first|upper }}{{ user.last_name|first|upper }}
-                            {% else %}
-                            {{ user.username|first|upper }}
-                            {% endif %}
-                        </div>
-                        <div>
-                            <div class="user-name">
-                                {{ user.get_full_name|default:user.username }}
-                            </div>
-                            <div class="user-status">Партнер</div>
-                            <span class="status-badge">{{ user.partner_level }}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <ul class="sidebar-menu">
-                    <li><a href="{% url 'cabinet:dashboard' %}" class="active">
-                        <i class="fas fa-tachometer-alt"></i> Главная ЛК</a>
-                    </li>
-                    <li><a href="#"><i class="fas fa-link"></i> Реферальная ссылка</a></li>
-                    <li><a href="#"><i class="fas fa-user-plus"></i> Регистрация пользователя</a></li>
-                    <li><a href="#"><i class="fas fa-sitemap"></i> Моя структура</a></li>
-                    <!--                    <li><a href="{% url 'cabinet:purchases' %}">-->
-                    <li><a href="#">
-                        <i class="fas fa-shopping-bag"></i> Мои покупки</a>
-                    </li>
-                    <li><a href="#"><i class="fas fa-newspaper"></i> Новости компании</a></li>
-                    <li><a href="#"><i class="fas fa-wallet"></i> Финансы</a></li>
-                    <!--                    <li><a href="{% url 'cabinet:finance' %}"><i class="fas fa-wallet"></i> Финансы</a></li>-->
-                    <li><a href="#"><i class="fas fa-cog"></i> Настройки</a></li>
-                    <!--                    <li><a href="{% url 'cabinet:profile' %}"><i class="fas fa-cog"></i> Настройки</a></li>-->
-                </ul>
-            </div>
+            {% include 'includes/sidebar.html' %}
         </div>
-
         <!-- Основная информация -->
         <div class="col-lg-9">
             <!-- Приветствие -->

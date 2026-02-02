@@ -3,6 +3,7 @@ import logging
 
 import requests
 from django.core.cache import cache
+from django.core.exceptions import PermissionDenied
 
 from core.settings import FASTAPI_SERVICE_URL
 from .tasks import update_user_stats_cache
@@ -248,3 +249,12 @@ def get_user_team(request):
 def api_test_page(request):
     """Страница для тестирования API"""
     return render(request, 'cabinet/admin_api.html')
+
+
+@login_required
+def admin_panel(request):
+    """Админ-панель для магазинов и администраторов"""
+    if not request.user.can_access_admin:
+        raise PermissionDenied("У вас нет доступа к админ-панели")
+
+    return render(request, 'cabinet/admin_panel.html')
