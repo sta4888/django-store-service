@@ -25,8 +25,8 @@
         </li>
 
         {% if user.is_store or user.is_staff %}
-        <li><a href="{% url 'cabinet:admin_panel' %}"
-               class="{% if request.resolver_match.url_name == 'admin_panel' %}active{% endif %}">
+        <li><a href="{% url 'cabinet:admin_page' %}"
+               class="{% if request.resolver_match.url_name == 'admin_page' %}active{% endif %}">
             <i class="fas fa-cog"></i> Администрирование</a>
         </li>
         {% endif %}

@@ -17,6 +17,6 @@ urlpatterns = [
     path('api/user/lo/add/', views.add_user_lo, name='add_user_lo'),
     path('api/user/lo/subtract/', views.sub_user_lo, name='sub_user_lo'),
 
-    path('admin', views.admin_panel, name='admin_page'),
+    path('admin/', views.admin_panel, name='admin_page'),
 
 ]
