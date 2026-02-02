@@ -9,8 +9,8 @@ urlpatterns = [
     path('profile/', views.profile_view, name='profile'),
     path('purchases/', views.purchases_view, name='purchases'),
     path('finance/', views.finance_view, name='finance'),
-    path('api/refresh-stats/', views.refresh_stats, name='refresh_stats'),
-    path('api/get-stats/', views.get_stats_json, name='get_stats_json'),
+    # path('api/refresh-stats/', views.refresh_stats, name='refresh_stats'),
+    # path('api/get-stats/', views.get_stats_json, name='get_stats_json'),
 
     path('api/user/status/', views.get_user_data, name='get_user_data'),
     path('api/user/team/', views.get_user_team, name='get_user_team'),
