@@ -226,13 +226,16 @@ document.addEventListener('DOMContentLoaded', function() {
             `;
             
             try {
-                const response = await fetch(`/cabinet/api/lo/add/${userId}/`, {
+                const response = await fetch(`/cabinet/api/user/lo/add/`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRFToken': formData.get('csrfmiddlewaretoken')
                     },
-                    body: JSON.stringify({ lo: parseFloat(loAmount) })
+                    body: JSON.stringify({
+        user_id: userId,
+        lo: parseFloat(loAmount)
+    })
                 });
                 
                 const data = await response.json();
@@ -298,14 +301,18 @@ document.addEventListener('DOMContentLoaded', function() {
             `;
             
             try {
-                const response = await fetch(`/cabinet/api/lo/subtract/${userId}/`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': formData.get('csrfmiddlewaretoken')
-                    },
-                    body: JSON.stringify({ lo: parseFloat(loAmount) })
-                });
+                const response = await fetch('/cabinet/api/user/lo/subtract/', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+    },
+    body: JSON.stringify({
+        user_id: userId,
+        lo: parseFloat(loAmount)
+    })
+});
+
                 
                 const data = await response.json();
                 

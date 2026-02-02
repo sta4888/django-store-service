@@ -125,7 +125,7 @@ def get_user_data(request):
 
 @login_required
 def add_user_lo(request):
-    user_id = request.user.username
+    # user_id = request.user.username
 
     # Получаем данные из POST запроса
     if request.method == 'POST':
@@ -137,6 +137,7 @@ def add_user_lo(request):
             data = request.POST.dict()
 
         lo_amount = data.get('lo')
+        user_id = data.get('user_id')
 
         if not lo_amount:
             return JsonResponse(
@@ -176,7 +177,7 @@ def add_user_lo(request):
 
 @login_required
 def sub_user_lo(request):
-    user_id = request.user.username
+    # user_id = request.user.username
 
     # Получаем данные из POST запроса
     if request.method == 'POST':
@@ -188,6 +189,7 @@ def sub_user_lo(request):
             data = request.POST.dict()
 
         lo_amount = data.get('lo')
+        user_id = data.get('user_id')
 
         if not lo_amount:
             return JsonResponse(
