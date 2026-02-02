@@ -271,7 +271,7 @@
                 lastUpdated.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Обновление...';
             }
 
-            fetch('api/get-data/')
+            fetch('api/user/status/')
                 .then(response => response.json())
                 .then(data => {
                     if (!data.error) {
