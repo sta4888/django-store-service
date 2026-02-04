@@ -15,7 +15,7 @@ DEBUG = True
 
 SECURE_CROSS_ORIGIN_OPENER_POLICY = None
 
-ALLOWED_HOSTS = ["45.130.148.158", "localhost", "45.130.148.146"]
+ALLOWED_HOSTS = ["45.130.148.158", "localhost", "45.130.148.146", "www.everonuz.com", "everonuz.com"]
 
 # Application definition
 
