@@ -16,7 +16,7 @@ services:
     command: >
       sh -c "
       uv run python manage.py migrate &&
-      uv run gunicorn core.wsgi:application --bind 0.0.0.0:8000
+      uv run gunicorn core.wsgi:application -c gunicorn.conf.py
       --reload
       "
     ports:
