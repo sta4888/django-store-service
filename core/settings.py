@@ -191,8 +191,10 @@ CACHES = {
     }
 }
 
+# http://45.130.148.146:8001/docs#/Users/create_user_user_users_post
+
 # URL FastAPI сервиса
-FASTAPI_SERVICE_URL = os.environ.get('FASTAPI_URL', "http://45.130.148.158:8001")
+FASTAPI_SERVICE_URL = os.environ.get('FASTAPI_URL', "http://45.130.148.146:8001")
 
 CELERY_TASK_MAX_RETRIES = 3
 
