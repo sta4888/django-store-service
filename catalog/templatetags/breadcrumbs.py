@@ -33,11 +33,19 @@ def show_breadcrumbs(context, obj=None):
                     break
 
     # Добавляем домашнюю страницу в начало
-    if breadcrumbs and breadcrumbs[0]['url'] != reverse('catalog:index'):
-        breadcrumbs.insert(0, {
-            'name': 'Главная',
-            'url': reverse('pages:home')  # или '/' если нет отдельного приложения
-        })
+    if breadcrumbs:
+        if request and request.user.is_authenticated:
+            home_name = 'Кабинет'
+            home_url = reverse('cabinet:dashboard')  # проверь namespace
+        else:
+            home_name = 'Главная'
+            home_url = reverse('catalog:index')  # или pages:home
+
+        if breadcrumbs[0]['url'] != home_url:
+            breadcrumbs.insert(0, {
+                'name': home_name,
+                'url': home_url,
+            })
 
     return {
         'breadcrumbs': breadcrumbs,
