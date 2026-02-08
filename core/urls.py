@@ -7,7 +7,7 @@ from accounts import views as accounts_views
 
 urlpatterns = [
     path('', include('catalog.urls', namespace='catalog')),
-    path('admin/', admin.site.urls),
+    path('deeplink/admin-pannel/', admin.site.urls),
     path('accounts/', include('accounts.urls')),
     path('cabinet/', include('cabinet.urls')),
     path('register/<str:referral_link>/', accounts_views.referral_register_view, name='referral_register'),
