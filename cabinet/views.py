@@ -4,7 +4,7 @@ import logging
 import requests
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
-
+from django.core.paginator import Paginator
 from core.settings import FASTAPI_SERVICE_URL
 # from .tasks import update_user_stats_cache
 from django.http import JsonResponse
@@ -258,3 +258,73 @@ def admin_panel(request):
         raise PermissionDenied("У вас нет доступа к админ-панели")
 
     return render(request, 'cabinet/admin_panel.html')
+
+
+@login_required
+def structure_view(request):
+    """Страница структуры рефералов пользователя"""
+    user = request.user
+    
+    # Получаем рефералов первого уровня
+    direct_referrals = CustomUser.objects.filter(
+        referrer=user
+    ).select_related('referrer').order_by('-date_joined')
+    
+    # Пагинация
+    paginator = Paginator(direct_referrals, 20)  # 20 записей на страницу
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    # Получаем общую статистику
+    total_referrals = user.total_referrals
+    active_referrals = user.active_referrals
+    group_volume = user.group_volume
+    
+    context = {
+        'direct_referrals': page_obj,
+        'total_referrals': total_referrals,
+        'active_referrals': active_referrals,
+        'group_volume': group_volume,
+    }
+    
+    return render(request, 'cabinet/structure.html', context)
+
+
+# Дополнительная функция для AJAX-загрузки рефералов (по желанию)
+@login_required
+def get_referrals_json(request):
+    """Получение списка рефералов в формате JSON"""
+    user = request.user
+    level = request.GET.get('level', '1')
+    
+    try:
+        level = int(level)
+    except ValueError:
+        level = 1
+    
+    if level == 1:
+        # Первый уровень
+        referrals = CustomUser.objects.filter(referrer=user)
+    else:
+        # Можно реализовать рекурсивный поиск для более глубоких уровней
+        referrals = CustomUser.objects.none()  # Заглушка
+    
+    referrals_data = []
+    for referral in referrals:
+        referrals_data.append({
+            'id': referral.user_id,
+            'name': referral.get_full_name() or referral.username,
+            'email': referral.email,
+            'phone': referral.phone,
+            'registration_date': referral.date_joined.strftime('%d.%m.%Y'),
+            'personal_volume': float(referral.personal_volume),
+            'group_volume': float(referral.group_volume),
+            'partner_level': referral.partner_level,
+            'total_referrals': referral.total_referrals,
+        })
+    
+    return JsonResponse({
+        'level': level,
+        'referrals': referrals_data,
+        'total_count': len(referrals_data)
+    })

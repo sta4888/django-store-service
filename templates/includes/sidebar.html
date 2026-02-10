@@ -33,7 +33,12 @@
 
         <li><a href="#"><i class="fas fa-link"></i> Реферальная ссылка</a></li>
         <li><a href="#"><i class="fas fa-user-plus"></i> Регистрация пользователя</a></li>
-        <li><a href="#"><i class="fas fa-sitemap"></i> Моя структура</a></li>
+        <li>
+            <a href="{% url 'cabinet:structure' %}"
+            class="{% if request.resolver_match.url_name == 'structure' %}active{% endif %}">
+                <i class="fas fa-sitemap"></i> Моя структура
+            </a>
+        </li>
         <li><a href="#"><i class="fas fa-shopping-bag"></i> Мои покупки</a></li>
         <li><a href="#"><i class="fas fa-newspaper"></i> Новости компании</a></li>
         <li><a href="#"><i class="fas fa-wallet"></i> Финансы</a></li>
