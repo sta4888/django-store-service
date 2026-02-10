@@ -13,6 +13,7 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Sum
 from .models import Purchase, News
 from datetime import datetime, timedelta
+from account.models import CustomUser
 
 from .services.fastapi_service import FastAPIService
 
