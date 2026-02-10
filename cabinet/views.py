@@ -329,3 +329,35 @@ def get_referrals_json(request):
         'referrals': referrals_data,
         'total_count': len(referrals_data)
     })
+
+
+@login_required
+def get_referral_details(request, user_id):
+    """Получение детальной информации о реферале в формате JSON"""
+    try:
+        referral = CustomUser.objects.get(user_id=user_id)
+        
+        # Проверяем, что это реферал текущего пользователя
+        if referral.referrer != request.user:
+            return JsonResponse({'error': 'Доступ запрещен'}, status=403)
+        
+        data = {
+            'id': referral.user_id,
+            'name': referral.get_full_name() or referral.username,
+            'email': referral.email,
+            'phone': referral.phone,
+            'country': referral.country,
+            'registration_date': referral.date_joined.strftime('%d.%m.%Y'),
+            'personal_volume': float(referral.personal_volume),
+            'group_volume': float(referral.group_volume),
+            'partner_level': referral.partner_level,
+            'user_type': referral.user_type,
+            'total_referrals': referral.total_referrals,
+            'active_referrals': referral.active_referrals,
+            'earnings': float(referral.earnings),
+        }
+        
+        return JsonResponse(data)
+        
+    except CustomUser.DoesNotExist:
+        return JsonResponse({'error': 'Пользователь не найден'}, status=404)

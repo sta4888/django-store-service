@@ -19,6 +19,7 @@ urlpatterns = [
     path('api/user/lo/add/', views.add_user_lo, name='add_user_lo'),
     path('api/user/lo/subtract/', views.sub_user_lo, name='sub_user_lo'),
     path('api/referrals/', views.get_referrals_json, name='referrals_json'),
+    path('api/referrals/<str:user_id>/details/', views.get_referral_details, name='referral_details'),
 
     path('admin/', views.admin_panel, name='admin_page'),
 
