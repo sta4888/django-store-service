@@ -266,54 +266,15 @@ def structure_view(request):
     """Страница структуры рефералов пользователя"""
     user = request.user
     
-    try:
-        # Получаем структуру из FastAPI
-        response = requests.get(
-            f"{FASTAPI_SERVICE_URL}/user/users/{user.username}/structure",
-            timeout=5
-        )
-        response.raise_for_status()
-        api_data = response.json()
-        
-        if api_data.get('error'):
-            raise Exception(api_data.get('error_msg', 'Ошибка при получении данных'))
-            
-        structure_data = api_data.get('data', {})
-        team_members = structure_data.get('team', [])
-        
-    except requests.RequestException as e:
-        logger.error(f"Ошибка при получении структуры: {e}")
-        team_members = []
-    
-    # Получаем пользовательские данные из БД для рефералов
-    referral_user_ids = [str(member.get('user_id')) for member in team_members]
-    db_referrals = CustomUser.objects.filter(user_id__in=referral_user_ids)
-    
-    # Создаем словарь для быстрого доступа
-    db_referrals_dict = {str(ref.user_id): ref for ref in db_referrals}
-    api_referrals_dict = {str(member.get('user_id')): member for member in team_members}
-    
-    # Объединяем данные
-    combined_referrals = []
-    for user_id, api_data in api_referrals_dict.items():
-        db_data = db_referrals_dict.get(user_id)
-        if db_data:
-            combined_referrals.append({
-                'db_data': db_data,
-                'api_data': api_data,
-                'user_id': user_id
-            })
+    # Получаем рефералов первого уровня
+    direct_referrals = CustomUser.objects.filter(
+        referrer=user
+    ).select_related('referrer').order_by('-date_joined')
     
     # Пагинация
-    paginator = Paginator(combined_referrals, 20)
+    paginator = Paginator(direct_referrals, 20)  # 20 записей на страницу
     page_number = request.GET.get('page')
-    
-    try:
-        page_obj = paginator.get_page(page_number)
-    except PageNotAnInteger:
-        page_obj = paginator.get_page(1)
-    except EmptyPage:
-        page_obj = paginator.get_page(paginator.num_pages)
+    page_obj = paginator.get_page(page_number)
     
     # Получаем общую статистику
     total_referrals = user.total_referrals
@@ -333,7 +294,7 @@ def structure_view(request):
 # Дополнительная функция для AJAX-загрузки рефералов (по желанию)
 @login_required
 def get_referrals_json(request):
-    """Получение списка рефералов в формате JSON"""
+    """Получение списка рефералов в формате JSON с данными из API"""
     user = request.user
     level = request.GET.get('level', '1')
     
@@ -342,61 +303,197 @@ def get_referrals_json(request):
     except ValueError:
         level = 1
     
-    if level == 1:
-        # Первый уровень
-        referrals = CustomUser.objects.filter(referrer=user)
-    else:
-        # Можно реализовать рекурсивный поиск для более глубоких уровней
-        referrals = CustomUser.objects.none()  # Заглушка
+    try:
+        # Получаем структуру из FastAPI
+        response = requests.get(
+            f"{FASTAPI_SERVICE_URL}/user/users/{user.username}/structure",
+            timeout=5
+        )
+        response.raise_for_status()
+        api_data = response.json()
+        
+        if api_data.get('error'):
+            return JsonResponse({
+                'error': True,
+                'message': api_data.get('error_msg', 'Ошибка при получении данных')
+            }, status=500)
+            
+        structure_data = api_data.get('data', {})
+        team_members = structure_data.get('team', [])
+        
+    except requests.RequestException as e:
+        logger.error(f"Ошибка API при получении структуры: {e}")
+        return JsonResponse({
+            'error': True,
+            'message': str(e)
+        }, status=503)
     
-    referrals_data = []
-    for referral in referrals:
-        referrals_data.append({
-            'id': referral.user_id,
-            'name': referral.get_full_name() or referral.username,
-            'email': referral.email,
-            'phone': referral.phone,
-            'registration_date': referral.date_joined.strftime('%d.%m.%Y'),
-            'personal_volume': float(referral.personal_volume),
-            'group_volume': float(referral.group_volume),
-            'partner_level': referral.partner_level,
-            'total_referrals': referral.total_referrals,
+    # Получаем данные из БД
+    referral_user_ids = [str(member.get('user_id')) for member in team_members]
+    db_referrals = CustomUser.objects.filter(user_id__in=referral_user_ids)
+    db_referrals_dict = {str(ref.user_id): ref for ref in db_referrals}
+    
+    # Обрабатываем только первый уровень
+    if level == 1:
+        referrals_data = []
+        for api_member in team_members:
+            user_id = str(api_member.get('user_id'))
+            db_data = db_referrals_dict.get(user_id)
+            
+            if db_data:
+                member_data = {
+                    'id': user_id,
+                    'name': db_data.get_full_name() or db_data.username,
+                    'email': db_data.email,
+                    'phone': db_data.phone,
+                    'country': db_data.country,
+                    'registration_date': db_data.date_joined.strftime('%d.%m.%Y'),
+                    'personal_volume': float(api_member.get('lo', 0)),  # Из API
+                    'group_volume': float(db_data.group_volume),  # Из БД
+                    'partner_level': db_data.partner_level,
+                    'user_type': db_data.user_type,
+                    'total_referrals': db_data.total_referrals,
+                    'active_referrals': db_data.active_referrals,
+                    'earnings': float(db_data.earnings),
+                    'team_count': len(api_member.get('team', [])),
+                }
+                referrals_data.append(member_data)
+        
+        return JsonResponse({
+            'level': level,
+            'referrals': referrals_data,
+            'total_count': len(referrals_data),
+            'error': False
+        })
+    
+    # Для второго уровня и глубже (рекурсивно)
+    elif level > 1:
+        all_referrals_data = []
+        
+        def get_deep_referrals(members, current_level, max_level):
+            if current_level > max_level:
+                return []
+            
+            referrals_data = []
+            for member in members:
+                user_id = str(member.get('user_id'))
+                
+                try:
+                    # Получаем структуру для каждого члена команды
+                    member_response = requests.get(
+                        f"{FASTAPI_SERVICE_URL}/user/users/{user_id}/structure",
+                        timeout=3
+                    )
+                    if member_response.status_code == 200:
+                        member_data = member_response.json()
+                        if not member_data.get('error'):
+                            # Получаем данные из БД
+                            try:
+                                db_data = CustomUser.objects.get(user_id=user_id)
+                            except CustomUser.DoesNotExist:
+                                db_data = None
+                            
+                            member_info = {
+                                'id': user_id,
+                                'level': current_level,
+                                'personal_volume': float(member.get('lo', 0)),
+                                'team_count': len(member.get('team', [])),
+                            }
+                            
+                            if db_data:
+                                member_info.update({
+                                    'name': db_data.get_full_name() or db_data.username,
+                                    'email': db_data.email,
+                                    'phone': db_data.phone,
+                                    'registration_date': db_data.date_joined.strftime('%d.%m.%Y'),
+                                    'group_volume': float(db_data.group_volume),
+                                    'partner_level': db_data.partner_level,
+                                })
+                            
+                            referrals_data.append(member_info)
+                            
+                            # Рекурсивно получаем команду
+                            if current_level < max_level:
+                                sub_team = member_data.get('data', {}).get('team', [])
+                                referrals_data.extend(
+                                    get_deep_referrals(sub_team, current_level + 1, max_level)
+                                )
+                except:
+                    continue
+            
+            return referrals_data
+        
+        # Начинаем рекурсию с команды первого уровня
+        deep_referrals = get_deep_referrals(team_members, 2, level)
+        
+        return JsonResponse({
+            'level': level,
+            'referrals': deep_referrals,
+            'total_count': len(deep_referrals),
+            'error': False
         })
     
     return JsonResponse({
         'level': level,
-        'referrals': referrals_data,
-        'total_count': len(referrals_data)
+        'referrals': [],
+        'total_count': 0,
+        'error': False
     })
+
 
 
 @login_required
 def get_referral_details(request, user_id):
-    """Получение детальной информации о реферале в формате JSON"""
+    """Получение детальной информации о реферале"""
     try:
-        referral = CustomUser.objects.get(user_id=user_id)
+        # Проверяем, что пользователь существует
+        db_user = CustomUser.objects.get(user_id=user_id)
         
         # Проверяем, что это реферал текущего пользователя
-        if referral.referrer != request.user:
-            return JsonResponse({'error': 'Доступ запрещен'}, status=403)
+        if db_user.referrer != request.user:
+            return JsonResponse({'error': True, 'message': 'Доступ запрещен'}, status=403)
+        
+        # Получаем данные из API
+        try:
+            response = requests.get(
+                f"{FASTAPI_SERVICE_URL}/user/users/{user_id}/status",
+                timeout=5
+            )
+            if response.status_code == 200:
+                api_data = response.json()
+                lo_amount = api_data.get('lo', 0)
+            else:
+                lo_amount = 0
+        except:
+            lo_amount = 0
         
         data = {
-            'id': referral.user_id,
-            'name': referral.get_full_name() or referral.username,
-            'email': referral.email,
-            'phone': referral.phone,
-            'country': referral.country,
-            'registration_date': referral.date_joined.strftime('%d.%m.%Y'),
-            'personal_volume': float(referral.personal_volume),
-            'group_volume': float(referral.group_volume),
-            'partner_level': referral.partner_level,
-            'user_type': referral.user_type,
-            'total_referrals': referral.total_referrals,
-            'active_referrals': referral.active_referrals,
-            'earnings': float(referral.earnings),
+            'id': db_user.user_id,
+            'name': db_user.get_full_name() or db_user.username,
+            'email': db_user.email,
+            'phone': db_user.phone,
+            'country': db_user.country,
+            'registration_date': db_user.date_joined.strftime('%d.%m.%Y'),
+            'personal_volume': float(lo_amount),  # Из API
+            'group_volume': float(db_user.group_volume),
+            'partner_level': db_user.partner_level,
+            'user_type': db_user.user_type,
+            'total_referrals': db_user.total_referrals,
+            'active_referrals': db_user.active_referrals,
+            'earnings': float(db_user.earnings),
+            'available_for_withdrawal': float(db_user.available_for_withdrawal),
+            'middle_name': db_user.middle_name or '',
+            'passport_number': db_user.passport_number or '',
+            'is_email_verified': db_user.is_email_verified,
+            'is_terms_accepted': db_user.is_terms_accepted,
+            'referral_code': db_user.referral_code,
+            'error': False
         }
         
         return JsonResponse(data)
         
     except CustomUser.DoesNotExist:
-        return JsonResponse({'error': 'Пользователь не найден'}, status=404)
+        return JsonResponse({'error': True, 'message': 'Пользователь не найден'}, status=404)
+    except Exception as e:
+        logger.error(f"Ошибка при получении деталей реферала: {e}")
+        return JsonResponse({'error': True, 'message': str(e)}, status=500)
