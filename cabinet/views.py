@@ -266,15 +266,54 @@ def structure_view(request):
     """Страница структуры рефералов пользователя"""
     user = request.user
     
-    # Получаем рефералов первого уровня
-    direct_referrals = CustomUser.objects.filter(
-        referrer=user
-    ).select_related('referrer').order_by('-date_joined')
+    try:
+        # Получаем структуру из FastAPI
+        response = requests.get(
+            f"{FASTAPI_SERVICE_URL}/user/users/{user.username}/structure",
+            timeout=5
+        )
+        response.raise_for_status()
+        api_data = response.json()
+        
+        if api_data.get('error'):
+            raise Exception(api_data.get('error_msg', 'Ошибка при получении данных'))
+            
+        structure_data = api_data.get('data', {})
+        team_members = structure_data.get('team', [])
+        
+    except requests.RequestException as e:
+        logger.error(f"Ошибка при получении структуры: {e}")
+        team_members = []
+    
+    # Получаем пользовательские данные из БД для рефералов
+    referral_user_ids = [str(member.get('user_id')) for member in team_members]
+    db_referrals = CustomUser.objects.filter(user_id__in=referral_user_ids)
+    
+    # Создаем словарь для быстрого доступа
+    db_referrals_dict = {str(ref.user_id): ref for ref in db_referrals}
+    api_referrals_dict = {str(member.get('user_id')): member for member in team_members}
+    
+    # Объединяем данные
+    combined_referrals = []
+    for user_id, api_data in api_referrals_dict.items():
+        db_data = db_referrals_dict.get(user_id)
+        if db_data:
+            combined_referrals.append({
+                'db_data': db_data,
+                'api_data': api_data,
+                'user_id': user_id
+            })
     
     # Пагинация
-    paginator = Paginator(direct_referrals, 20)  # 20 записей на страницу
+    paginator = Paginator(combined_referrals, 20)
     page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    
+    try:
+        page_obj = paginator.get_page(page_number)
+    except PageNotAnInteger:
+        page_obj = paginator.get_page(1)
+    except EmptyPage:
+        page_obj = paginator.get_page(paginator.num_pages)
     
     # Получаем общую статистику
     total_referrals = user.total_referrals
