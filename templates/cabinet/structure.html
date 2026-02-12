@@ -380,6 +380,7 @@ function loadReferralsByLevel(level) {
     // Показываем индикатор загрузки
     const tbody = document.querySelector('tbody');
     const oldContent = tbody.innerHTML;
+    const table = document.querySelector('table');
     
     tbody.innerHTML = `
         <tr>
@@ -396,6 +397,10 @@ function loadReferralsByLevel(level) {
     fetch(`/cabinet/api/referrals/?level=${level}`)
         .then(response => response.json())
         .then(data => {
+            if (data.error) {
+                throw new Error(data.message);
+            }
+            
             if (data.referrals.length === 0) {
                 tbody.innerHTML = `
                     <tr>
@@ -412,22 +417,106 @@ function loadReferralsByLevel(level) {
                 return;
             }
             
-            // Обновляем таблицу с новыми данными
-            updateTable(data.referrals);
+            // Обновляем таблицу
+            updateTable(data.referrals, level);
         })
         .catch(error => {
             console.error('Ошибка при загрузке рефералов:', error);
             tbody.innerHTML = oldContent;
             
             // Показываем ошибку
-            const alert = document.createElement('div');
-            alert.className = 'alert alert-danger alert-dismissible fade show mt-3';
-            alert.innerHTML = `
-                <strong>Ошибка!</strong> Не удалось загрузить данные. ${error.message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            `;
-            document.querySelector('.col-lg-9').prepend(alert);
+            showAlert('danger', `Ошибка: ${error.message}`);
         });
+}
+
+function updateTable(referrals, level) {
+    const tbody = document.querySelector('tbody');
+    let html = '';
+    
+    referrals.forEach(referral => {
+        const levelClass = level > 1 ? `level-${referral.level || level}` : '';
+        
+        html += `
+            <tr class="${levelClass}">
+                <td class="ps-4 fw-bold">${referral.id}</td>
+                <td>
+                    <div class="d-flex align-items-center">
+                        <div class="avatar-sm me-3">
+                            <div class="avatar-title bg-light text-accent rounded-circle">
+                                ${referral.name?.charAt(0) || 'U'}
+                            </div>
+                        </div>
+                        <div>
+                            <div class="fw-medium">${referral.name || `Пользователь ${referral.id}`}</div>
+                            <small class="text-muted">
+                                ${referral.level ? `Уровень ${referral.level}` : 'Прямой реферал'}
+                            </small>
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    ${referral.email ? `
+                    <div class="small">
+                        <i class="fas fa-envelope fa-xs me-1 text-muted"></i>
+                        ${referral.email}
+                    </div>` : ''}
+                    ${referral.phone ? `
+                    <div class="small">
+                        <i class="fas fa-phone fa-xs me-1 text-muted"></i>
+                        ${referral.phone}
+                    </div>` : ''}
+                </td>
+                <td>
+                    ${referral.registration_date ? `
+                    <div class="small">${referral.registration_date}</div>
+                    ` : '<div class="text-muted">-</div>'}
+                </td>
+                <td>
+                    <div class="fw-medium">${referral.personal_volume || 0} бал</div>
+                    <div class="text-muted extra-small">Группа: ${referral.group_volume || 0} бал</div>
+                </td>
+                <td>
+                    ${referral.partner_level ? `
+                    <span class="badge ${referral.partner_level === 'Начинающий' ? 'bg-secondary' : 'bg-accent'}">
+                        ${referral.partner_level}
+                    </span>
+                    ` : '<span class="badge bg-secondary">-</span>'}
+                </td>
+                <td>
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-users fa-xs text-muted me-2"></i>
+                        <span class="fw-medium">${referral.team_count || referral.total_referrals || 0}</span>
+                    </div>
+                </td>
+                <td class="pe-4">
+                    <div class="btn-group btn-group-sm">
+                        ${referral.id ? `
+                        <button type="button" class="btn btn-outline-secondary" 
+                                data-bs-toggle="tooltip" title="Просмотр деталей"
+                                onclick="showReferralDetails('${referral.id}')">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        ` : ''}
+                        ${referral.email ? `
+                        <button type="button" class="btn btn-outline-secondary"
+                                data-bs-toggle="tooltip" title="Написать сообщение"
+                                onclick="window.location.href='mailto:${referral.email}'">
+                            <i class="fas fa-envelope"></i>
+                        </button>
+                        ` : ''}
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+    
+    tbody.innerHTML = html;
+    
+    // Переинициализируем тултипы
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
 }
 
 function filterTable(searchTerm) {
@@ -446,7 +535,7 @@ function filterTable(searchTerm) {
         }
     });
     
-    // Если ничего не найдено
+    // Если ничего не найдено и есть поисковый запрос
     if (visibleCount === 0 && searchTerm) {
         const noResults = document.createElement('tr');
         noResults.innerHTML = `
@@ -471,82 +560,12 @@ function showReferralDetails(userId) {
     fetch(`/cabinet/api/referrals/${userId}/details/`)
         .then(response => response.json())
         .then(data => {
+            if (data.error) {
+                throw new Error(data.message);
+            }
+            
             const modalBody = document.getElementById('referralDetails');
-            modalBody.innerHTML = `
-                <div class="user-details">
-                    <div class="text-center mb-4">
-                        <div class="avatar-lg mx-auto mb-3">
-                            <div class="avatar-title bg-light text-accent rounded-circle" style="width: 80px; height: 80px; font-size: 2rem;">
-                                ${data.name.charAt(0)}
-                            </div>
-                        </div>
-                        <h4>${data.name}</h4>
-                        <span class="badge bg-${data.user_type === 'store' ? 'warning' : 'accent'}">
-                            ${data.user_type === 'store' ? 'Магазин' : 'Партнер'}
-                        </span>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="detail-row">
-                                <div class="detail-label">ID пользователя:</div>
-                                <div class="detail-value fw-medium">${data.id}</div>
-                            </div>
-                            <div class="detail-row">
-                                <div class="detail-label">Email:</div>
-                                <div class="detail-value">${data.email || '<span class="text-muted">Не указан</span>'}</div>
-                            </div>
-                            <div class="detail-row">
-                                <div class="detail-label">Телефон:</div>
-                                <div class="detail-value">${data.phone || '<span class="text-muted">Не указан</span>'}</div>
-                            </div>
-                            <div class="detail-row">
-                                <div class="detail-label">Страна:</div>
-                                <div class="detail-value">${data.country || '<span class="text-muted">Не указана</span>'}</div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="detail-row">
-                                <div class="detail-label">Дата регистрации:</div>
-                                <div class="detail-value">${data.registration_date}</div>
-                            </div>
-                            <div class="detail-row">
-                                <div class="detail-label">Личный объем:</div>
-                                <div class="detail-value fw-medium">${data.personal_volume} бал</div>
-                            </div>
-                            <div class="detail-row">
-                                <div class="detail-label">Групповой объем:</div>
-                                <div class="detail-value">${data.group_volume} бал</div>
-                            </div>
-                            <div class="detail-row">
-                                <div class="detail-label">Уровень партнера:</div>
-                                <div class="detail-value">
-                                    <span class="badge ${data.partner_level === 'Начинающий' ? 'bg-secondary' : 'bg-accent'}">
-                                        ${data.partner_level}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="mt-4 pt-3 border-top">
-                        <div class="row text-center">
-                            <div class="col">
-                                <div class="h4 mb-1">${data.total_referrals}</div>
-                                <div class="text-muted small">Всего рефералов</div>
-                            </div>
-                            <div class="col">
-                                <div class="h4 mb-1">${data.active_referrals || 0}</div>
-                                <div class="text-muted small">Активных</div>
-                            </div>
-                            <div class="col">
-                                <div class="h4 mb-1">${data.earnings || 0}</div>
-                                <div class="text-muted small">Начисления</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
+            modalBody.innerHTML = createReferralDetailsHTML(data);
         })
         .catch(error => {
             document.getElementById('referralDetails').innerHTML = `
@@ -556,6 +575,115 @@ function showReferralDetails(userId) {
                 </div>
             `;
         });
+}
+
+function createReferralDetailsHTML(data) {
+    return `
+        <div class="user-details">
+            <div class="text-center mb-4">
+                <div class="avatar-lg mx-auto mb-3">
+                    <div class="avatar-title bg-light text-accent rounded-circle" style="width: 80px; height: 80px; font-size: 2rem;">
+                        ${data.name?.charAt(0) || 'U'}
+                    </div>
+                </div>
+                <h4>${data.name || `Пользователь ${data.id}`}</h4>
+                <span class="badge ${data.user_type === 'store' ? 'bg-warning' : 'bg-accent'}">
+                    ${data.user_type === 'store' ? 'Магазин' : 'Партнер'}
+                </span>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="detail-row">
+                        <div class="detail-label">ID пользователя:</div>
+                        <div class="detail-value fw-medium">${data.id}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Email:</div>
+                        <div class="detail-value">${data.email || '<span class="text-muted">Не указан</span>'}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Телефон:</div>
+                        <div class="detail-value">${data.phone || '<span class="text-muted">Не указан</span>'}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Страна:</div>
+                        <div class="detail-value">${data.country || '<span class="text-muted">Не указана</span>'}</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="detail-row">
+                        <div class="detail-label">Дата регистрации:</div>
+                        <div class="detail-value">${data.registration_date || '<span class="text-muted">Не указана</span>'}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Личный объем (LO):</div>
+                        <div class="detail-value fw-medium">${data.personal_volume || 0} бал</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Групповой объем:</div>
+                        <div class="detail-value">${data.group_volume || 0} бал</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Уровень партнера:</div>
+                        <div class="detail-value">
+                            <span class="badge ${data.partner_level === 'Начинающий' ? 'bg-secondary' : 'bg-accent'}">
+                                ${data.partner_level || 'Не указан'}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-4 pt-3 border-top">
+                <div class="row text-center">
+                    <div class="col">
+                        <div class="h4 mb-1">${data.total_referrals || 0}</div>
+                        <div class="text-muted small">Всего рефералов</div>
+                    </div>
+                    <div class="col">
+                        <div class="h4 mb-1">${data.active_referrals || 0}</div>
+                        <div class="text-muted small">Активных</div>
+                    </div>
+                    <div class="col">
+                        <div class="h4 mb-1">${data.earnings || 0}</div>
+                        <div class="text-muted small">Начисления</div>
+                    </div>
+                </div>
+            </div>
+            
+            ${data.available_for_withdrawal ? `
+            <div class="alert alert-success mt-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="fas fa-wallet me-2"></i>
+                        <strong>Доступно для вывода:</strong>
+                    </div>
+                    <div class="h5 mb-0">${data.available_for_withdrawal} сум</div>
+                </div>
+            </div>
+            ` : ''}
+        </div>
+    `;
+}
+
+function showAlert(type, message) {
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} alert-dismissible fade show mt-3`;
+    alert.innerHTML = `
+        <i class="fas fa-${type === 'danger' ? 'exclamation-circle' : 'check-circle'} me-2"></i>
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    const container = document.querySelector('.col-lg-9');
+    container.insertBefore(alert, container.firstChild);
+    
+    setTimeout(() => {
+        if (alert.parentNode) {
+            alert.remove();
+        }
+    }, 5000);
 }
 
 function shareReferralLink() {
@@ -572,28 +700,38 @@ function shareReferralLink() {
     } else {
         navigator.clipboard.writeText(referralLink)
             .then(() => {
-                // Показываем уведомление
-                const alert = document.createElement('div');
-                alert.className = 'alert alert-success alert-dismissible fade show position-fixed top-0 end-0 m-3';
-                alert.style.zIndex = '1060';
-                alert.innerHTML = `
-                    <i class="fas fa-check-circle me-2"></i>
-                    <strong>Ссылка скопирована!</strong> Можете поделиться ей.
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                `;
-                document.body.appendChild(alert);
-                
-                setTimeout(() => {
-                    alert.remove();
-                }, 3000);
+                showAlert('success', 'Реферальная ссылка скопирована в буфер обмена!');
+            })
+            .catch(err => {
+                showAlert('danger', 'Не удалось скопировать ссылку');
             });
     }
 }
-
-// Функция для обновления таблицы (заглушка)
-function updateTable(referrals) {
-    console.log('Обновление таблицы с данными:', referrals);
-    // Здесь можно реализовать обновление таблицы через AJAX
-}
 </script>
+
+<style>
+.level-2 td:first-child {
+    padding-left: 50px !important;
+    position: relative;
+}
+
+.level-2 td:first-child::before {
+    content: "↳";
+    position: absolute;
+    left: 25px;
+    color: var(--color-gray-500);
+}
+
+.level-3 td:first-child {
+    padding-left: 70px !important;
+    position: relative;
+}
+
+.level-3 td:first-child::before {
+    content: "↳";
+    position: absolute;
+    left: 45px;
+    color: var(--color-gray-500);
+}
+</style>
 {% endblock %}
