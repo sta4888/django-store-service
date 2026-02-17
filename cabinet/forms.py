@@ -1,6 +1,6 @@
 from django import forms
 from django.contrib.auth.forms import PasswordChangeForm
-from users.models import CustomUser  # поправь путь если нужно
+from accounts.models import CustomUser  # поправь путь если нужно
 
 
 class ProfileUpdateForm(forms.ModelForm):
