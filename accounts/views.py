@@ -380,8 +380,7 @@ def forgot_password(request):
         form = ForgotPasswordForm(request.POST)
 
         if form.is_valid():
-            email = form.cleaned_data["email"]
-            user = CustomUser.objects.get(email__iexact=email)
+            user = form.user  # <-- уже есть
 
             code = user.generate_email_verification_code()
 
