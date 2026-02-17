@@ -195,3 +195,79 @@ class LoginForm(AuthenticationForm):  # Наследуем от AuthenticationFo
                     pass
 
         return cleaned_data
+
+
+class PasswordResetRequestForm(forms.Form):
+    """Форма запроса на восстановление пароля"""
+    user_id = forms.CharField(
+        max_length=20,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Введите ваш ID'
+        }),
+        label="ID пользователя"
+    )
+    email = forms.EmailField(
+        widget=forms.EmailInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Введите ваш email'
+        }),
+        label="Email"
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        user_id = cleaned_data.get('user_id')
+        email = cleaned_data.get('email')
+
+        if user_id and email:
+            try:
+                user = CustomUser.objects.get(user_id=user_id, email=email)
+                # Сохраняем пользователя для использования в представлении
+                self.user = user
+            except CustomUser.DoesNotExist:
+                raise ValidationError("Пользователь с таким ID и email не найден.")
+        return cleaned_data
+
+
+class PasswordResetConfirmForm(forms.Form):
+    """Форма подтверждения кода и установки нового пароля"""
+    verification_code = forms.CharField(
+        max_length=6,
+        min_length=6,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Введите 6-значный код',
+            'pattern': '[0-9]{6}',
+            'maxlength': '6'
+        }),
+        label="Код подтверждения"
+    )
+    new_password = forms.CharField(
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Введите новый пароль'
+        }),
+        label="Новый пароль"
+    )
+    confirm_password = forms.CharField(
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Подтвердите пароль'
+        }),
+        label="Подтверждение пароля"
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        new_password = cleaned_data.get('new_password')
+        confirm_password = cleaned_data.get('confirm_password')
+
+        if new_password and confirm_password and new_password != confirm_password:
+            raise ValidationError("Пароли не совпадают.")
+
+        # Проверка сложности пароля
+        if new_password and len(new_password) < 8:
+            raise ValidationError("Пароль должен содержать минимум 8 символов.")
+
+        return cleaned_data
