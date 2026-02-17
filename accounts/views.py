@@ -17,7 +17,7 @@ from django.http import Http404
 
 from cabinet.services.fastapi_service import FastAPIService
 from .models import CustomUser
-from .forms import ReferralRegistrationForm, EmailVerificationForm, LoginForm
+from .forms import ReferralRegistrationForm, EmailVerificationForm, LoginForm, ForgotPasswordForm
 from .tasks import send_verification_email_task, send_welcome_email_task, send_referral_notification_task
 
 logger = logging.getLogger(__name__)
