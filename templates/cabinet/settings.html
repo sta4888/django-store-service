@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+
+<div class="container">
+    <h2>Настройки аккаунта</h2>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-success">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="row">
+
+        <!-- ОБНОВЛЕНИЕ ПРОФИЛЯ -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Личные данные</h4>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        {{ profile_form.as_p }}
+                        <button type="submit" name="update_profile" class="btn btn-primary">
+                            Сохранить изменения
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- СМЕНА ПАРОЛЯ -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Смена пароля</h4>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        {{ password_form.as_p }}
+                        <button type="submit" name="change_password" class="btn btn-danger">
+                            Изменить пароль
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+{% endblock %}

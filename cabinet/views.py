@@ -497,3 +497,48 @@ def get_referral_details(request, user_id):
     except Exception as e:
         logger.error(f"Ошибка при получении деталей реферала: {e}")
         return JsonResponse({'error': True, 'message': str(e)}, status=500)
+
+
+
+
+
+
+######################################################################################
+
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.contrib.auth import update_session_auth_hash
+
+from .forms import ProfileUpdateForm, CustomPasswordChangeForm
+
+
+@login_required
+def settings_view(request):
+    user = request.user
+
+    if request.method == 'POST':
+        profile_form = ProfileUpdateForm(request.POST, instance=user)
+        password_form = CustomPasswordChangeForm(user, request.POST)
+
+        if 'update_profile' in request.POST:
+            if profile_form.is_valid():
+                profile_form.save()
+                messages.success(request, 'Профиль успешно обновлен')
+                return redirect('cabinet:settings')
+
+        elif 'change_password' in request.POST:
+            if password_form.is_valid():
+                user = password_form.save()
+                update_session_auth_hash(request, user)  # чтобы не разлогинило
+                messages.success(request, 'Пароль успешно изменён')
+                return redirect('cabinet:settings')
+
+    else:
+        profile_form = ProfileUpdateForm(instance=user)
+        password_form = CustomPasswordChangeForm(user)
+
+    return render(request, 'cabinet/settings.html', {
+        'profile_form': profile_form,
+        'password_form': password_form,
+    })

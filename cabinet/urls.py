@@ -10,6 +10,7 @@ urlpatterns = [
     path('purchases/', views.purchases_view, name='purchases'),
     path('finance/', views.finance_view, name='finance'),
     path('structure/', views.structure_view, name='structure'),
+    path('settings/', views.settings_view, name='settings'),
     
 
     path('api/user/status/', views.get_user_data, name='get_user_data'),
