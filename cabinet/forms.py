@@ -25,16 +25,32 @@ class ProfileUpdateForm(forms.ModelForm):
         }
 
 
-class CustomPasswordChangeForm(PasswordChangeForm):
-    old_password = forms.CharField(
-        widget=forms.PasswordInput(attrs={'class': 'form-control'}),
-        label='Текущий пароль'
-    )
+class CustomSetPasswordForm(forms.Form):
     new_password1 = forms.CharField(
-        widget=forms.PasswordInput(attrs={'class': 'form-control'}),
-        label='Новый пароль'
+        label="Новый пароль",
+        widget=forms.PasswordInput(attrs={'class': 'form-control'})
     )
     new_password2 = forms.CharField(
-        widget=forms.PasswordInput(attrs={'class': 'form-control'}),
-        label='Подтвердите новый пароль'
+        label="Подтвердите пароль",
+        widget=forms.PasswordInput(attrs={'class': 'form-control'})
     )
+
+    def __init__(self, user, *args, **kwargs):
+        self.user = user
+        super().__init__(*args, **kwargs)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        password1 = cleaned_data.get("new_password1")
+        password2 = cleaned_data.get("new_password2")
+
+        if password1 and password2 and password1 != password2:
+            raise forms.ValidationError("Пароли не совпадают")
+
+        return cleaned_data
+
+    def save(self):
+        password = self.cleaned_data["new_password1"]
+        self.user.set_password(password)
+        self.user.save()
+        return self.user

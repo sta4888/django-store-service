@@ -3,56 +3,64 @@
 
 {% block content %}
 
-<div class="container">
-    <h2>Настройки аккаунта</h2>
+<div class="dashboard-wrapper">
 
-    {% if messages %}
-        {% for message in messages %}
-            <div class="alert alert-success">
-                {{ message }}
-            </div>
-        {% endfor %}
-    {% endif %}
+    <!-- SIDEBAR -->
+    {% include 'cabinet/sidebar.html' %}
 
-    <div class="row">
+    <!-- MAIN CONTENT -->
+    <div class="main-content">
+        <h2>Настройки аккаунта</h2>
 
-        <!-- ОБНОВЛЕНИЕ ПРОФИЛЯ -->
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h4>Личные данные</h4>
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-success">
+                    {{ message }}
                 </div>
-                <div class="card-body">
-                    <form method="post">
-                        {% csrf_token %}
-                        {{ profile_form.as_p }}
-                        <button type="submit" name="update_profile" class="btn btn-primary">
-                            Сохранить изменения
-                        </button>
-                    </form>
+            {% endfor %}
+        {% endif %}
+
+        <div class="row">
+
+            <!-- ЛИЧНЫЕ ДАННЫЕ -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h4>Личные данные</h4>
+                    </div>
+                    <div class="card-body">
+                        <form method="post">
+                            {% csrf_token %}
+                            {{ profile_form.as_p }}
+                            <button type="submit" name="update_profile" class="btn btn-primary">
+                                Сохранить
+                            </button>
+                        </form>
+                    </div>
                 </div>
             </div>
+
+            <!-- СМЕНА ПАРОЛЯ -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h4>Смена пароля</h4>
+                    </div>
+                    <div class="card-body">
+                        <form method="post">
+                            {% csrf_token %}
+                            {{ password_form.as_p }}
+                            <button type="submit" name="change_password" class="btn btn-danger">
+                                Изменить пароль
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
         </div>
-
-        <!-- СМЕНА ПАРОЛЯ -->
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h4>Смена пароля</h4>
-                </div>
-                <div class="card-body">
-                    <form method="post">
-                        {% csrf_token %}
-                        {{ password_form.as_p }}
-                        <button type="submit" name="change_password" class="btn btn-danger">
-                            Изменить пароль
-                        </button>
-                    </form>
-                </div>
-            </div>
-        </div>
-
     </div>
+
 </div>
 
 {% endblock %}

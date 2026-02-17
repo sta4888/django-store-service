@@ -519,24 +519,24 @@ def settings_view(request):
 
     if request.method == 'POST':
         profile_form = ProfileUpdateForm(request.POST, instance=user)
-        password_form = CustomPasswordChangeForm(user, request.POST)
+        password_form = CustomSetPasswordForm(user, request.POST)
 
         if 'update_profile' in request.POST:
             if profile_form.is_valid():
                 profile_form.save()
-                messages.success(request, 'Профиль успешно обновлен')
+                messages.success(request, 'Профиль обновлен')
                 return redirect('cabinet:settings')
 
         elif 'change_password' in request.POST:
             if password_form.is_valid():
                 user = password_form.save()
-                update_session_auth_hash(request, user)  # чтобы не разлогинило
+                update_session_auth_hash(request, user)
                 messages.success(request, 'Пароль успешно изменён')
                 return redirect('cabinet:settings')
 
     else:
         profile_form = ProfileUpdateForm(instance=user)
-        password_form = CustomPasswordChangeForm(user)
+        password_form = CustomSetPasswordForm(user)
 
     return render(request, 'cabinet/settings.html', {
         'profile_form': profile_form,
