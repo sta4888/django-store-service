@@ -271,3 +271,22 @@ class PasswordResetConfirmForm(forms.Form):
             raise ValidationError("Пароль должен содержать минимум 8 символов.")
 
         return cleaned_data
+
+
+
+class ForgotPasswordForm(forms.Form):
+    email = forms.EmailField(
+        label="Email",
+        widget=forms.EmailInput(attrs={
+            "class": "form-control",
+            "placeholder": "Введите ваш email",
+        })
+    )
+
+    def clean_email(self):
+        email = self.cleaned_data.get("email")
+
+        if not CustomUser.objects.filter(email__iexact=email).exists():
+            raise forms.ValidationError("Пользователь с таким email не найден")
+
+        return email

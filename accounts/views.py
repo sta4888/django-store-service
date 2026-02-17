@@ -373,3 +373,31 @@ def task_result_detail_view(request, task_id):
     except TaskResult.DoesNotExist:
         messages.error(request, 'Задача не найдена')
         return redirect('accounts:task_results')
+
+
+def forgot_password(request):
+    if request.method == "POST":
+        form = ForgotPasswordForm(request.POST)
+
+        if form.is_valid():
+            email = form.cleaned_data["email"]
+            user = CustomUser.objects.get(email__iexact=email)
+
+            code = user.generate_email_verification_code()
+
+            send_verification_email_task.delay(
+                email=user.email,
+                code=code,
+                username=user.get_full_name()
+            )
+
+            request.session["user_for_verification"] = user.user_id
+            request.session["email_for_verification"] = user.email
+            request.session["password_reset"] = True
+
+            messages.info(request, "Код подтверждения отправлен на вашу почту.")
+            return redirect("accounts:verify_email")
+    else:
+        form = ForgotPasswordForm()
+
+    return render(request, "accounts/forgot_password.html", {"form": form})
