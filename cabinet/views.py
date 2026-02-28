@@ -443,6 +443,58 @@ def get_referrals_json(request):
 
 
 @login_required
+def referral_tree_api(request):
+    """
+    Возвращает дерево рефералов для текущего пользователя.
+    Без учёта глубины — загружает всю структуру целиком.
+    """
+    nodes = []
+    edges = []
+    visited = set()  # защита от циклов
+
+    def get_short_name(user):
+        parts = [user.first_name, user.last_name]
+        name = ' '.join(p for p in parts if p).strip()
+        return name or user.username
+
+    def get_full_name(user):
+        parts = [user.last_name, user.first_name, getattr(user, 'middle_name', '')]
+        name = ' '.join(p for p in parts if p).strip()
+        return name or user.username
+
+    def traverse(user, level):
+        if user.pk in visited:
+            return
+        visited.add(user.pk)
+
+        nodes.append({
+            'id':              user.user_id,
+            'label':           get_short_name(user),
+            'title':           get_full_name(user),   # для тултипа
+            'level':           level,
+            'active':          getattr(user, 'is_active', True),
+            'personal_volume': float(getattr(user, 'personal_volume', 0) or 0),
+            'group_volume':    float(getattr(user, 'group_volume', 0) or 0),
+            'partner_level':   getattr(user, 'partner_level', ''),
+            'total_referrals': getattr(user, 'total_referrals', 0),
+            'user_type':       getattr(user, 'user_type', 'partner'),
+        })
+
+        # Загружаем прямых рефералов одним запросом
+        referrals = CustomUser.objects.filter(referrer=user)
+
+        for referral in referrals:
+            edges.append({'from': user.user_id, 'to': referral.user_id})
+            traverse(referral, level + 1)
+
+    # Стартуем с текущего пользователя
+    traverse(request.user, level=0)
+
+    return JsonResponse({'nodes': nodes, 'edges': edges})
+
+
+
+@login_required
 def get_referral_details(request, user_id):
     """Получение детальной информации о реферале"""
     try:
