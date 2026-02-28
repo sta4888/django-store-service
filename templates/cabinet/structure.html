@@ -299,20 +299,20 @@
                     </div>
 
                     <!-- Контейнер графа -->
-                    <div id="graphContainer" style="height: 600px; position: relative;">
-                        <!-- Индикатор загрузки (показывается до загрузки данных) -->
+                    <div id="graphContainer" style="height: 600px; position: relative; overflow: auto; background: #f8f9fa;">
+                        <!-- Индикатор загрузки -->
                         <div id="graphLoader" class="d-flex flex-column align-items-center justify-content-center h-100">
                             <div class="spinner-border text-accent mb-3" role="status">
                                 <span class="visually-hidden">Загрузка...</span>
                             </div>
                             <p class="text-muted">Загрузка графа структуры...</p>
                         </div>
-                        <!-- Сюда Vis.js отрисует граф -->
-                        <div id="graphNetwork" style="width:100%; height:100%; display:none;"></div>
+                        <!-- SVG граф -->
+                        <svg id="graphSVG" style="display:none; min-width:100%;"></svg>
                     </div>
 
                     <!-- Тултип при наведении на узел -->
-                    <div id="graphTooltip" class="graph-tooltip shadow-sm" style="display:none;"></div>
+                    <div id="graphTooltip" class="graph-tooltip shadow-sm" style="display:none; position:fixed; z-index:9999;"></div>
 
                 </div>
                 <!-- /ВКЛАДКА ГРАФ -->
@@ -427,22 +427,16 @@
 
 
 {% block extra_js %}
-<!-- Vis.js Network (CDN) -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.9/dist/vis-network.min.js"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.9/dist/dist/vis-network.min.css">
-
 <script>
 /* ============================================================
-   СПИСОК РЕФЕРАЛОВ — старый код без изменений
+   СПИСОК РЕФЕРАЛОВ
    ============================================================ */
 document.addEventListener('DOMContentLoaded', function () {
 
-    // Тултипы Bootstrap
     document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el =>
         new bootstrap.Tooltip(el)
     );
 
-    // Фильтрация по уровню
     document.querySelectorAll('.filter-tabs .btn').forEach(btn => {
         btn.addEventListener('click', function () {
             document.querySelectorAll('.filter-tabs .btn').forEach(b => {
@@ -455,277 +449,258 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    // Поиск
     let searchTimeout;
     document.getElementById('searchReferrals').addEventListener('input', function (e) {
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(() => filterTable(e.target.value.toLowerCase()), 300);
     });
 
-    // Ленивая загрузка графа — только когда пользователь открывает вкладку
+    // Ленивая загрузка графа
     document.getElementById('graph-tab').addEventListener('shown.bs.tab', function () {
         initGraph();
-    });
-
-    // Смена глубины графа
-    document.getElementById('graphDepth').addEventListener('change', function () {
-        initGraph(parseInt(this.value));
     });
 });
 
 
 /* ============================================================
-   ГРАФ СТРУКТУРЫ
+   ГРАФ — чистый SVG, без библиотек
    ============================================================ */
-let networkInstance = null;   // глобальная ссылка на граф
 
-/**
- * Загружает данные с сервера и рисует дерево рефералов.
- * @param {number} depth — глубина дерева (1–3)
- */
-function initGraph(depth) {
-    depth = depth || parseInt(document.getElementById('graphDepth').value) || 3;
+const NODE_W  = 110;   // ширина карточки
+const NODE_H  = 52;    // высота карточки
+const GAP_Y   = 100;   // вертикальный отступ между уровнями
+const GAP_X   = 20;    // горизонтальный отступ между узлами
 
-    const loader  = document.getElementById('graphLoader');
-    const netDiv  = document.getElementById('graphNetwork');
+let graphLoaded = false;
 
-    // Показываем спиннер, скрываем граф
-    loader.style.display  = 'flex';
-    netDiv.style.display  = 'none';
+function initGraph() {
+    if (graphLoaded) return;   // грузим только один раз
 
-    // Уничтожаем старый граф (если был)
-    if (networkInstance) {
-        networkInstance.destroy();
-        networkInstance = null;
-    }
+    const loader = document.getElementById('graphLoader');
+    const svg    = document.getElementById('graphSVG');
 
-    fetch(`/cabinet/api/referrals/tree/?depth=${depth}`)
+    loader.style.display = 'flex';
+    svg.style.display    = 'none';
+
+    fetch('/cabinet/api/referrals/tree/')
         .then(r => r.json())
         .then(data => {
             if (data.error) throw new Error(data.message);
-            renderGraph(data);
+            renderSVG(data);
+            graphLoaded = true;
         })
         .catch(err => {
             loader.innerHTML = `
                 <div class="text-center text-danger">
                     <i class="fas fa-exclamation-triangle fa-2x mb-2"></i>
                     <p>${err.message || 'Не удалось загрузить граф'}</p>
-                    <button class="btn btn-sm btn-outline-secondary mt-2" onclick="initGraph()">
+                    <button class="btn btn-sm btn-outline-secondary mt-2" onclick="graphLoaded=false; initGraph()">
                         <i class="fas fa-redo me-1"></i>Попробовать снова
                     </button>
                 </div>`;
         });
 }
 
-/**
- * Принимает JSON {nodes: [...], edges: [...]} и рисует граф через Vis.js.
- *
- * Ожидаемый формат node:
- * {
- *   id: 1,
- *   label: "Иван И.",        // отображается под узлом
- *   title: "Иван Иванов",   // используется для тултипа (опционально)
- *   level: 0,               // 0 = корень (вы), 1 = прямые рефералы, …
- *   active: true,           // активен ли пользователь
- *   personal_volume: 120,
- *   partner_level: "Партнер",
- *   total_referrals: 5
- * }
- *
- * Ожидаемый формат edge:
- * { from: 0, to: 1 }
- */
-function renderGraph(data) {
+function renderSVG(data) {
     const loader = document.getElementById('graphLoader');
-    const netDiv = document.getElementById('graphNetwork');
+    const svg    = document.getElementById('graphSVG');
 
-    // --- Цвета ---
-    const COLOR_ROOT    = getComputedStyle(document.documentElement)
-                            .getPropertyValue('--color-accent').trim() || '#198754';
-    const COLOR_ACTIVE  = getComputedStyle(document.documentElement)
-                            .getPropertyValue('--color-blue').trim()   || '#0d6efd';
-    const COLOR_PASSIVE = '#adb5bd';
-    const COLOR_FONT    = '#343a40';
+    /* ── 1. Строим карту дочерних узлов ── */
+    const nodeMap   = {};                          // id → node
+    const childMap  = {};                          // id → [child_id, ...]
+    data.nodes.forEach(n => { nodeMap[n.id] = n; childMap[n.id] = []; });
+    data.edges.forEach(e => { if (childMap[e.from]) childMap[e.from].push(e.to); });
 
-    // --- Подготовка узлов ---
-    const nodes = data.nodes.map(n => {
-        const isRoot   = n.level === 0;
-        const color    = isRoot ? COLOR_ROOT : (n.active ? COLOR_ACTIVE : COLOR_PASSIVE);
-        const size     = isRoot ? 36 : Math.max(20, 28 - n.level * 4);
+    const rootId = data.nodes.find(n => n.level === 0)?.id;
+    if (!rootId) return;
 
-        return {
-            id:    n.id,
-            label: n.label,
-            // Храним оригинальные данные для тултипа
-            _data: n,
-            shape: 'circularImage',
-            // Если нет аватара — рисуем инициалы через canvas data-URL
-            image: n.avatar_url || generateAvatar(n.label, color),
-            size:  size,
-            font: {
-                size:  isRoot ? 14 : 12,
-                color: COLOR_FONT,
-                face:  'system-ui, sans-serif',
-            },
-            borderWidth: isRoot ? 3 : 2,
-            color: {
-                border:     color,
-                background: color,
-                highlight:  { border: color, background: color },
-                hover:      { border: color, background: color },
-            },
-        };
+    /* ── 2. Layout — рекурсивно считаем X через листья ── */
+    let cursorX = GAP_X + NODE_W / 2;
+
+    function calcLayout(id) {
+        const children = childMap[id] || [];
+        const node = nodeMap[id];
+
+        if (children.length === 0) {
+            node._x = cursorX;
+            cursorX += NODE_W + GAP_X;
+            return;
+        }
+
+        children.forEach(cid => calcLayout(cid));
+
+        // Центрируем родителя над детьми
+        const firstX = nodeMap[children[0]]._x;
+        const lastX  = nodeMap[children[children.length - 1]]._x;
+        node._x = (firstX + lastX) / 2;
+    }
+
+    calcLayout(rootId);
+
+    // Считаем Y по уровню
+    data.nodes.forEach(n => {
+        n._y = GAP_Y / 2 + n.level * (NODE_H + GAP_Y);
     });
 
-    const edges = data.edges.map(e => ({
-        from:   e.from,
-        to:     e.to,
-        arrows: { to: { enabled: true, scaleFactor: 0.6 } },
-        color:  { color: '#dee2e6', highlight: COLOR_ACTIVE, hover: '#adb5bd' },
-        width:  1.5,
-        smooth: { type: 'cubicBezier', forceDirection: 'vertical', roundness: 0.4 },
-    }));
+    /* ── 3. Размеры холста ── */
+    const maxX   = Math.max(...data.nodes.map(n => n._x)) + NODE_W / 2 + GAP_X;
+    const maxY   = Math.max(...data.nodes.map(n => n._y)) + NODE_H / 2 + GAP_Y / 2;
 
-    // --- Опции Vis.js ---
-    const options = {
-        layout: {
-            improvedLayout: false,        // отключаем медленный Kamada-Kawai
-            hierarchical: {
-                enabled:              true,
-                direction:            'UD',
-                sortMethod:           'directed',
-                levelSeparation:      110,
-                nodeSpacing:          80,
-                treeSpacing:          120,
-                parentCentralization: true,
-                edgeMinimization:     false,  // ускоряет расчёт позиций
-            },
-        },
-        physics: { enabled: false },
-        interaction: {
-            hover:            true,
-            tooltipDelay:     0,
-            hideEdgesOnDrag:  true,
-        },
-        nodes: {
-            borderWidthSelected: 3,
-            shapeProperties: { useBorderWithImage: true },
-        },
-        edges: {
-            selectionWidth: 2,
-        },
-    };
+    svg.setAttribute('width',  maxX);
+    svg.setAttribute('height', maxY);
+    svg.setAttribute('viewBox', `0 0 ${maxX} ${maxY}`);
+    svg.innerHTML = '';
 
-    // --- Показываем контейнер ДО создания графа ---
-    // Vis.js рисует сразу синхронно при hierarchical + physics:false,
-    // поэтому лоадер убираем заранее, чтобы не было задержки
-    loader.style.display = 'none';
-    netDiv.style.display = 'block';
+    const NS = 'http://www.w3.org/2000/svg';
 
-    // --- Рисуем ---
-    networkInstance = new vis.Network(
-        netDiv,
-        { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) },
-        options
-    );
+    /* ── 4. Рисуем рёбра (сначала — под узлами) ── */
+    data.edges.forEach(e => {
+        const from = nodeMap[e.from];
+        const to   = nodeMap[e.to];
+        if (!from || !to) return;
 
-    // --- Кнопки управления ---
-    document.getElementById('btnZoomIn').onclick  = () => networkInstance.moveTo({ scale: networkInstance.getScale() * 1.3 });
-    document.getElementById('btnZoomOut').onclick = () => networkInstance.moveTo({ scale: networkInstance.getScale() * 0.7 });
-    document.getElementById('btnFit').onclick     = () => networkInstance.fit({ animation: { duration: 400, easingFunction: 'easeInOutQuad' } });
+        const x1 = from._x,  y1 = from._y + NODE_H / 2;
+        const x2 = to._x,    y2 = to._y   - NODE_H / 2;
+        const my = (y1 + y2) / 2;
 
-    // --- Кастомный тултип при наведении ---
-    const tooltip = document.getElementById('graphTooltip');
-
-    networkInstance.on('hoverNode', function (params) {
-        const nodeId = params.node;
-        const nodeData = nodes.find(n => n.id === nodeId)?._data;
-        if (!nodeData) return;
-
-        tooltip.innerHTML = buildTooltipHTML(nodeData);
-        tooltip.style.display = 'block';
-        positionTooltip(params.event);
+        const path = document.createElementNS(NS, 'path');
+        path.setAttribute('d', `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`);
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', '#ced4da');
+        path.setAttribute('stroke-width', '1.5');
+        svg.appendChild(path);
     });
 
-    networkInstance.on('blurNode', () => {
-        tooltip.style.display = 'none';
-    });
+    /* ── 5. Рисуем узлы ── */
+    data.nodes.forEach(n => {
+        const x = n._x - NODE_W / 2;
+        const y = n._y - NODE_H / 2;
 
-    document.getElementById('graphNetwork').addEventListener('mousemove', e => {
-        if (tooltip.style.display !== 'none') positionTooltip(e);
-    });
+        const isRoot  = n.level === 0;
+        const bgColor = isRoot ? '#198754' : (n.active ? '#0d6efd' : '#adb5bd');
+        const fgColor = '#ffffff';
 
-    // Клик по узлу — открываем детали (кроме корневого)
-    networkInstance.on('click', function (params) {
-        if (params.nodes.length > 0) {
-            const nodeId = params.nodes[0];
-            const nodeData = nodes.find(n => n.id === nodeId)?._data;
-            if (nodeData && nodeData.level !== 0) {
-                showReferralDetails(nodeId);
-            }
+        const g = document.createElementNS(NS, 'g');
+        g.setAttribute('class', 'svg-node');
+        g.setAttribute('cursor', isRoot ? 'default' : 'pointer');
+        g.setAttribute('data-id', n.id);
+
+        // Карточка
+        const rect = document.createElementNS(NS, 'rect');
+        rect.setAttribute('x',  x);
+        rect.setAttribute('y',  y);
+        rect.setAttribute('width',  NODE_W);
+        rect.setAttribute('height', NODE_H);
+        rect.setAttribute('rx', 8);
+        rect.setAttribute('ry', 8);
+        rect.setAttribute('fill', bgColor);
+        rect.setAttribute('stroke', isRoot ? '#145c32' : (n.active ? '#0a58ca' : '#909498'));
+        rect.setAttribute('stroke-width', isRoot ? 2 : 1.5);
+
+        // Имя (первая строка)
+        const shortName = trimLabel(n.label, 16);
+        const tName = document.createElementNS(NS, 'text');
+        tName.setAttribute('x', n._x);
+        tName.setAttribute('y', n._y - 8);
+        tName.setAttribute('text-anchor', 'middle');
+        tName.setAttribute('dominant-baseline', 'middle');
+        tName.setAttribute('fill', fgColor);
+        tName.setAttribute('font-size', isRoot ? '13' : '11');
+        tName.setAttribute('font-weight', 'bold');
+        tName.setAttribute('font-family', 'system-ui, sans-serif');
+        tName.textContent = shortName;
+
+        // ID (вторая строка)
+        const tId = document.createElementNS(NS, 'text');
+        tId.setAttribute('x', n._x);
+        tId.setAttribute('y', n._y + 10);
+        tId.setAttribute('text-anchor', 'middle');
+        tId.setAttribute('dominant-baseline', 'middle');
+        tId.setAttribute('fill', 'rgba(255,255,255,0.8)');
+        tId.setAttribute('font-size', '10');
+        tId.setAttribute('font-family', 'system-ui, sans-serif');
+        tId.textContent = `ID: ${n.id}`;
+
+        g.appendChild(rect);
+        g.appendChild(tName);
+        g.appendChild(tId);
+        svg.appendChild(g);
+
+        /* ── Тултип ── */
+        const tooltip = document.getElementById('graphTooltip');
+
+        g.addEventListener('mouseenter', function (e) {
+            tooltip.innerHTML = buildTooltipHTML(n);
+            tooltip.style.display = 'block';
+            moveTooltip(e);
+        });
+        g.addEventListener('mousemove', moveTooltip);
+        g.addEventListener('mouseleave', function () {
+            tooltip.style.display = 'none';
+        });
+
+        /* ── Клик → детали ── */
+        if (!isRoot) {
+            g.addEventListener('click', () => showReferralDetails(n.id));
         }
     });
+
+    /* ── 6. Показываем ── */
+    loader.style.display = 'none';
+    svg.style.display    = 'block';
+
+    /* ── Кнопки зума ── */
+    let scale = 1;
+    const container = document.getElementById('graphContainer');
+
+    document.getElementById('btnZoomIn').onclick = () => {
+        scale = Math.min(scale * 1.25, 3);
+        svg.style.transform = `scale(${scale})`;
+        svg.style.transformOrigin = 'top left';
+    };
+    document.getElementById('btnZoomOut').onclick = () => {
+        scale = Math.max(scale * 0.8, 0.3);
+        svg.style.transform = `scale(${scale})`;
+        svg.style.transformOrigin = 'top left';
+    };
+    document.getElementById('btnFit').onclick = () => {
+        scale = 1;
+        svg.style.transform = '';
+        container.scrollTo(0, 0);
+    };
 }
 
-/** Позиционирует тултип рядом с курсором */
-function positionTooltip(e) {
-    const tooltip = document.getElementById('graphTooltip');
-    const x = (e.clientX || e.pageX) + 14;
-    const y = (e.clientY || e.pageY) + 14;
+function trimLabel(str, max) {
+    return str && str.length > max ? str.slice(0, max - 1) + '…' : (str || '');
+}
 
-    // Не выходить за правый/нижний край экрана
+function moveTooltip(e) {
+    const tooltip = document.getElementById('graphTooltip');
+    const x = e.clientX + 14;
+    const y = e.clientY + 14;
     const tw = tooltip.offsetWidth;
     const th = tooltip.offsetHeight;
     tooltip.style.left = (x + tw > window.innerWidth  ? x - tw - 28 : x) + 'px';
     tooltip.style.top  = (y + th > window.innerHeight ? y - th - 28 : y) + 'px';
 }
 
-/** Создаёт HTML для тултипа узла */
 function buildTooltipHTML(n) {
-    const isActive = n.active;
     return `
         <div class="tt-name">${n.title || n.label}</div>
         <div class="tt-row"><b>ID:</b> ${n.id}</div>
-        ${n.partner_level ? `<div class="tt-row"><b>Уровень:</b> ${n.partner_level}</div>` : ''}
+        ${n.partner_level   ? `<div class="tt-row"><b>Статус:</b> ${n.partner_level}</div>` : ''}
         ${n.personal_volume != null ? `<div class="tt-row"><b>Личный объем:</b> ${n.personal_volume} бал</div>` : ''}
         ${n.total_referrals != null ? `<div class="tt-row"><b>Рефералов:</b> ${n.total_referrals}</div>` : ''}
         <div class="mt-1">
-            <span class="tt-badge ${isActive ? 'active' : ''}">
-                ${isActive ? 'Активный' : 'Неактивный'}
+            <span class="tt-badge ${n.active ? 'active' : ''}">
+                ${n.active ? 'Активный' : 'Неактивный'}
             </span>
-        </div>
-    `;
-}
-
-/**
- * Генерирует data-URL с аватаром из инициалов (canvas).
- * Используется как fallback, если у пользователя нет фото.
- */
-function generateAvatar(label, bgColor) {
-    const initials = (label || '?').substring(0, 1).toUpperCase();
-    const canvas   = document.createElement('canvas');
-    canvas.width   = canvas.height = 64;
-    const ctx      = canvas.getContext('2d');
-
-    // Фон
-    ctx.fillStyle = bgColor || '#adb5bd';
-    ctx.beginPath();
-    ctx.arc(32, 32, 32, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Инициалы
-    ctx.fillStyle   = '#ffffff';
-    ctx.font        = 'bold 28px system-ui, sans-serif';
-    ctx.textAlign   = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(initials, 32, 33);
-
-    return canvas.toDataURL();
+        </div>`;
 }
 
 
 /* ============================================================
-   КОД ДЛЯ ВКЛАДКИ «СПИСОК» (без изменений относительно оригинала)
+   СПИСОК РЕФЕРАЛОВ (без изменений)
    ============================================================ */
 function loadReferralsByLevel(level) {
     const tbody = document.querySelector('tbody');
@@ -929,10 +904,10 @@ function shareReferralLink() {
 </script>
 
 <style>
-/* Отступы уровней в списке */
 .level-2 td:first-child { padding-left: 50px !important; position: relative; }
 .level-2 td:first-child::before { content: "↳"; position: absolute; left: 25px; color: #adb5bd; }
 .level-3 td:first-child { padding-left: 70px !important; position: relative; }
 .level-3 td:first-child::before { content: "↳"; position: absolute; left: 45px; color: #adb5bd; }
 </style>
 {% endblock %}
+
