@@ -589,20 +589,23 @@ function renderGraph(data) {
     // --- Опции Vis.js ---
     const options = {
         layout: {
+            improvedLayout: false,        // отключаем медленный Kamada-Kawai
             hierarchical: {
-                enabled:          true,
-                direction:        'UD',        // сверху вниз
-                sortMethod:       'directed',
-                levelSeparation:  110,
-                nodeSpacing:      80,
-                treeSpacing:      120,
+                enabled:              true,
+                direction:            'UD',
+                sortMethod:           'directed',
+                levelSeparation:      110,
+                nodeSpacing:          80,
+                treeSpacing:          120,
+                parentCentralization: true,
+                edgeMinimization:     false,  // ускоряет расчёт позиций
             },
         },
         physics: { enabled: false },
         interaction: {
-            hover:          true,
-            tooltipDelay:   0,
-            hideEdgesOnDrag: true,
+            hover:            true,
+            tooltipDelay:     0,
+            hideEdgesOnDrag:  true,
         },
         nodes: {
             borderWidthSelected: 3,
@@ -613,18 +616,18 @@ function renderGraph(data) {
         },
     };
 
+    // --- Показываем контейнер ДО создания графа ---
+    // Vis.js рисует сразу синхронно при hierarchical + physics:false,
+    // поэтому лоадер убираем заранее, чтобы не было задержки
+    loader.style.display = 'none';
+    netDiv.style.display = 'block';
+
     // --- Рисуем ---
     networkInstance = new vis.Network(
         netDiv,
         { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) },
         options
     );
-
-    // Скрываем лоадер, показываем граф
-    networkInstance.once('afterDrawing', () => {
-        loader.style.display = 'none';
-        netDiv.style.display  = 'block';
-    });
 
     // --- Кнопки управления ---
     document.getElementById('btnZoomIn').onclick  = () => networkInstance.moveTo({ scale: networkInstance.getScale() * 1.3 });
