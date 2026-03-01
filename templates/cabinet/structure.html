@@ -496,97 +496,20 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 /* ============================================================
-   ГРАФ — тёмная тема, карточки с LO/GO, тултипы
+   ГРАФ — тёмная тема, один запрос, работаем только с деревом
    ============================================================ */
 
-const CARD_W  = 110;
-const CARD_H  = 68;
-const GAP_Y   = 110;
+const CARD_W = 110;
+const CARD_H = 68;
+const GAP_Y  = 110;
 
 let graphLoaded = false;
 
-function initGraph() {
-    if (graphLoaded) return;
-
-    const loader = document.getElementById('graphLoader');
-    const svg    = document.getElementById('graphSVG');
-
-    loader.style.display = 'flex';
-    svg.style.display    = 'none';
-
-    // Используем существующий Django-эндпоинт дерева
-    fetch('/cabinet/api/referrals/tree/')
-        .then(r => r.json())
-        .then(data => {
-            if (data.error) throw new Error(data.message || 'Ошибка API');
-
-            // Преобразуем nodes/edges → иерархическое дерево
-            const tree = buildTree(data.nodes, data.edges);
-            if (!tree) throw new Error('Нет данных');
-
-            // Параллельно запрашиваем /status для каждого узла
-            const allNodes = data.nodes;
-            const statusPromises = allNodes.map(n =>
-                fetch(`/cabinet/api/referrals/${n.id}/details/`)
-                    .then(r => r.json())
-                    .catch(() => null)
-            );
-
-            Promise.all(statusPromises).then(statuses => {
-                const statusMap = {};
-                allNodes.forEach((n, i) => {
-                    statusMap[n.id] = statuses[i] || {};
-                });
-                renderDarkTree(tree, data.nodes, data.edges, statusMap);
-                graphLoaded = true;
-            });
-        })
-        .catch(err => {
-            loader.innerHTML = `
-                <div style="text-align:center; color:#ef4444;">
-                    <i class="fas fa-exclamation-triangle fa-2x" style="margin-bottom:10px;"></i>
-                    <p style="color:#94a3b8;">${err.message || 'Не удалось загрузить граф'}</p>
-                    <button class="btn btn-sm btn-dark border-secondary mt-2"
-                            onclick="graphLoaded=false; initGraph()">
-                        <i class="fas fa-redo me-1"></i>Попробовать снова
-                    </button>
-                </div>`;
-        });
-}
-
-/* ── Строим иерархическое дерево из плоских nodes + edges ── */
-function buildTree(nodes, edges) {
-    const map = {};
-    nodes.forEach(n => { map[n.id] = { ...n, team: [] }; });
-    const childIds = new Set();
-    edges.forEach(e => {
-        if (map[e.from] && map[e.to]) {
-            map[e.from].team.push(map[e.to]);
-            childIds.add(e.to);
-        }
-    });
-    // Корень — тот, кто не является ничьим потомком
-    const root = nodes.find(n => !childIds.has(n.id));
-    return root ? map[root.id] : null;
-}
-
-/* ── Layout: позиционирование узлов ── */
-function layoutTree(node, state) {
-    node._y = state.startY + node.level * (CARD_H + GAP_Y);
-
-    if (!node.team || node.team.length === 0) {
-        state.cursor += state.gapX;
-        node._x = state.cursor;
-        return;
-    }
-    node.team.forEach(c => layoutTree(c, state));
-    node._x = (node.team[0]._x + node.team[node.team.length - 1]._x) / 2;
-}
-
-/* ── Считаем количество листьев ── */
-function countLeaves(node) {
-    if (!node.team || node.team.length === 0) return 1;
-    return node.team.reduce((s, c) => s + countLeaves(c), 0);
+/* ── SVG helper ── */
+function svgEl(tag, attrs) {
+    const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v));
+    return el;
 }
 
 /* ── Цветовая схема по LO ── */
@@ -597,188 +520,204 @@ function loStyle(lo) {
     return              { fill: '#14182a', stroke: '#3a4060', textColor: '#94a3b8' };
 }
 
-/* ── Создание SVG-элемента ── */
-function svgEl(tag, attrs) {
-    const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
-    Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v));
-    return el;
+/* ── Строим дерево из nodes + edges (оба id приводим к строке) ── */
+function buildTree(nodes, edges) {
+    const map = {};
+    nodes.forEach(n => { map[String(n.id)] = { ...n, id: String(n.id), _children: [] }; });
+
+    const childIds = new Set();
+    edges.forEach(e => {
+        const from = String(e.from), to = String(e.to);
+        if (map[from] && map[to]) {
+            map[from]._children.push(map[to]);
+            childIds.add(to);
+        }
+    });
+
+    const rootNode = nodes.find(n => !childIds.has(String(n.id)));
+    return rootNode ? map[String(rootNode.id)] : null;
 }
 
-/* ── Рендер дерева ── */
-function renderDarkTree(root, allNodes, edges, statusMap) {
-    const loader = document.getElementById('graphLoader');
-    const svg    = document.getElementById('graphSVG');
+/* ── Считаем листья ── */
+function countLeaves(node) {
+    if (!node._children || node._children.length === 0) return 1;
+    return node._children.reduce((s, c) => s + countLeaves(c), 0);
+}
 
-    const leaves = countLeaves(root);
-    const maxLvl = Math.max(...allNodes.map(n => n.level || 0));
+/* ── Layout — рекурсивно, всё хранится прямо в узлах дерева ── */
+function layoutTree(node, state) {
+    node._y = state.startY + (node.level || 0) * (CARD_H + GAP_Y);
 
-    const gapX  = Math.max(130, 130);
-    const totalW = Math.max(1000, (leaves + 1) * gapX);
-    const totalH = Math.max(500,  (maxLvl + 2) * (CARD_H + GAP_Y));
-
-    // Layout — считаем координаты на дереве
-    const state = { cursor: 0, gapX: totalW / (leaves + 1), startY: 50 };
-    layoutTree(root, state);
-
-    // Копируем _x/_y из дерева обратно в плоский массив allNodes
-    // (layoutTree работает с объектами дерева, allNodes — оригинальный массив из API)
-    function copyCoords(treeNode) {
-        const flat = allNodes.find(n => n.id === treeNode.id);
-        if (flat) { flat._x = treeNode._x; flat._y = treeNode._y; }
-        (treeNode.team || []).forEach(copyCoords);
+    if (!node._children || node._children.length === 0) {
+        state.cursor += state.gapX;
+        node._x = state.cursor;
+        return;
     }
-    copyCoords(root);
+    node._children.forEach(c => layoutTree(c, state));
+    node._x = (node._children[0]._x + node._children[node._children.length - 1]._x) / 2;
+}
 
-    // Настраиваем SVG
-    svg.setAttribute('width', totalW);
-    svg.setAttribute('height', totalH);
-    svg.setAttribute('viewBox', `0 0 ${totalW} ${totalH}`);
-    svg.style.background = '#0d0f14';
-    svg.innerHTML = '';
-
-    // Слой рёбер
-    const linksG = svgEl('g', {});
-    edges.forEach(e => {
-        const fromNode = allNodes.find(n => n.id === e.from);
-        const toNode   = allNodes.find(n => n.id === e.to);
-        if (!fromNode || !toNode) return;
-
-        const x1 = fromNode._x, y1 = fromNode._y + CARD_H / 2;
-        const x2 = toNode._x,   y2 = toNode._y   - CARD_H / 2;
+/* ── Рисуем рёбра рекурсивно по дереву ── */
+function drawLinks(node, container) {
+    (node._children || []).forEach(child => {
+        const x1 = node._x,  y1 = node._y  + CARD_H / 2;
+        const x2 = child._x, y2 = child._y - CARD_H / 2;
         const my = (y1 + y2) / 2;
 
-        const path = svgEl('path', {
+        container.appendChild(svgEl('path', {
             d: `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`,
             fill: 'none',
             stroke: '#2a2d38',
             'stroke-width': '1.5'
-        });
-        linksG.appendChild(path);
+        }));
+        drawLinks(child, container);
     });
-    svg.appendChild(linksG);
+}
 
-    // Слой узлов
-    const nodesG = svgEl('g', {});
-    allNodes.forEach(n => {
-        const status = statusMap[n.id] || {};
-        const lo = n.personal_volume || 0;
-        const go = n.group_volume || status.go || 0;
-        const qual = n.partner_level || status.qualification || '';
-        const style = loStyle(lo);
+/* ── Рисуем узлы рекурсивно по дереву ── */
+function drawNodes(node, container) {
+    const lo   = node.personal_volume || 0;
+    const go   = node.group_volume    || 0;
+    const qual = node.partner_level   || '';
+    const st   = loStyle(lo);
+    const cx   = node._x, cy = node._y;
+    const bx   = cx - CARD_W / 2, by = cy - CARD_H / 2;
 
-        const cx = n._x, cy = n._y;
-        const bx = cx - CARD_W / 2, by = cy - CARD_H / 2;
+    const g = svgEl('g', { style: 'cursor:pointer;' });
 
-        const g = svgEl('g', { style: 'cursor:pointer;' });
-
-        // Фон карточки
-        const rect = svgEl('rect', {
-            x: bx, y: by,
-            width: CARD_W, height: CARD_H,
-            rx: 8, ry: 8,
-            fill: style.fill,
-            stroke: style.stroke,
-            'stroke-width': '1.5'
-        });
-
-        // Верхняя акцентная полоска
-        const accentBar = svgEl('rect', {
-            x: bx + 1, y: by + 1,
-            width: CARD_W - 2, height: 3,
-            rx: 7,
-            fill: style.stroke
-        });
-
-        // ID
-        const tId = svgEl('text', {
-            x: cx, y: cy - 20,
-            'text-anchor': 'middle',
-            fill: '#e2e8f0',
-            'font-size': '11',
-            'font-weight': '700',
-            'font-family': 'JetBrains Mono, monospace'
-        });
-        tId.textContent = `#${n.id}`;
-
-        // Квалификация
-        const tQual = svgEl('text', {
-            x: cx, y: cy - 5,
-            'text-anchor': 'middle',
-            fill: '#94a3b8',
-            'font-size': '9',
-            'font-weight': '600',
-            'font-family': 'system-ui, sans-serif',
-            'letter-spacing': '0.04em'
-        });
-        tQual.textContent = qual.toUpperCase();
-
-        // LO label
-        const tLoL = svgEl('text', { x: cx - 22, y: cy + 14, 'text-anchor': 'middle', fill: '#64748b', 'font-size': '8', 'font-family': 'system-ui' });
-        tLoL.textContent = 'LO';
-        // LO value
-        const tLoV = svgEl('text', { x: cx - 22, y: cy + 25, 'text-anchor': 'middle', fill: style.textColor, 'font-size': '10', 'font-weight': '700', 'font-family': 'JetBrains Mono, monospace' });
-        tLoV.textContent = lo;
-
-        // Разделитель
-        const divLine = svgEl('line', { x1: cx, y1: cy + 8, x2: cx, y2: cy + 28, stroke: '#2a2d38', 'stroke-width': '1' });
-
-        // GO label
-        const tGoL = svgEl('text', { x: cx + 22, y: cy + 14, 'text-anchor': 'middle', fill: '#64748b', 'font-size': '8', 'font-family': 'system-ui' });
-        tGoL.textContent = 'GO';
-        // GO value
-        const tGoV = svgEl('text', { x: cx + 22, y: cy + 25, 'text-anchor': 'middle', fill: '#a78bfa', 'font-size': '10', 'font-weight': '700', 'font-family': 'JetBrains Mono, monospace' });
-        tGoV.textContent = go;
-
-        g.append(rect, accentBar, tId, tQual, tLoL, tLoV, divLine, tGoL, tGoV);
-
-        // Ховер — подсветка
-        g.addEventListener('mouseenter', function(e) {
-            rect.setAttribute('filter', 'brightness(1.3)');
-            showGraphTooltip(e, n, status);
-        });
-        g.addEventListener('mousemove', moveGraphTooltip);
-        g.addEventListener('mouseleave', function() {
-            rect.removeAttribute('filter');
-            hideGraphTooltip();
-        });
-
-        // Клик → детали (только не для рута)
-        if (n.level > 0) {
-            g.addEventListener('click', () => showReferralDetails(n.id));
-        }
-
-        nodesG.appendChild(g);
+    const rect = svgEl('rect', {
+        x: bx, y: by, width: CARD_W, height: CARD_H,
+        rx: 8, ry: 8, fill: st.fill, stroke: st.stroke, 'stroke-width': '1.5'
     });
-    svg.appendChild(nodesG);
+    const accentBar = svgEl('rect', {
+        x: bx + 1, y: by + 1, width: CARD_W - 2, height: 3,
+        rx: 7, fill: st.stroke
+    });
 
-    loader.style.display = 'none';
-    svg.style.display    = 'block';
+    // #ID
+    const tId = svgEl('text', { x: cx, y: cy - 20, 'text-anchor': 'middle',
+        fill: '#e2e8f0', 'font-size': '11', 'font-weight': '700',
+        'font-family': 'JetBrains Mono, monospace' });
+    tId.textContent = `#${node.id}`;
 
-    /* ── Зум ── */
-    let scale = 1;
-    const container = document.getElementById('graphContainer');
+    // Квалификация
+    const tQual = svgEl('text', { x: cx, y: cy - 5, 'text-anchor': 'middle',
+        fill: '#94a3b8', 'font-size': '9', 'font-weight': '600',
+        'font-family': 'system-ui, sans-serif', 'letter-spacing': '0.04em' });
+    tQual.textContent = qual.toUpperCase();
 
-    document.getElementById('btnZoomIn').onclick = () => {
-        scale = Math.min(scale * 1.25, 4);
-        svg.style.transform = `scale(${scale})`;
-        svg.style.transformOrigin = 'top left';
-    };
-    document.getElementById('btnZoomOut').onclick = () => {
-        scale = Math.max(scale * 0.8, 0.25);
-        svg.style.transform = `scale(${scale})`;
-        svg.style.transformOrigin = 'top left';
-    };
-    document.getElementById('btnFit').onclick = () => {
-        scale = 1;
-        svg.style.transform = '';
-        container.scrollTo(0, 0);
-    };
+    // LO
+    const tLoL = svgEl('text', { x: cx - 22, y: cy + 14, 'text-anchor': 'middle', fill: '#64748b', 'font-size': '8', 'font-family': 'system-ui' });
+    tLoL.textContent = 'LO';
+    const tLoV = svgEl('text', { x: cx - 22, y: cy + 25, 'text-anchor': 'middle', fill: st.textColor, 'font-size': '10', 'font-weight': '700', 'font-family': 'JetBrains Mono, monospace' });
+    tLoV.textContent = lo;
+
+    // Разделитель
+    const divLine = svgEl('line', { x1: cx, y1: cy + 8, x2: cx, y2: cy + 28, stroke: '#2a2d38', 'stroke-width': '1' });
+
+    // GO
+    const tGoL = svgEl('text', { x: cx + 22, y: cy + 14, 'text-anchor': 'middle', fill: '#64748b', 'font-size': '8', 'font-family': 'system-ui' });
+    tGoL.textContent = 'GO';
+    const tGoV = svgEl('text', { x: cx + 22, y: cy + 25, 'text-anchor': 'middle', fill: '#a78bfa', 'font-size': '10', 'font-weight': '700', 'font-family': 'JetBrains Mono, monospace' });
+    tGoV.textContent = go;
+
+    g.append(rect, accentBar, tId, tQual, tLoL, tLoV, divLine, tGoL, tGoV);
+
+    g.addEventListener('mouseenter', e => { rect.style.opacity = '0.85'; showGraphTooltip(e, node); });
+    g.addEventListener('mousemove',  moveGraphTooltip);
+    g.addEventListener('mouseleave', ()  => { rect.style.opacity = '1';   hideGraphTooltip(); });
+    if ((node.level || 0) > 0) {
+        g.addEventListener('click', () => showReferralDetails(node.id));
+    }
+
+    container.appendChild(g);
+    (node._children || []).forEach(c => drawNodes(c, container));
+}
+
+/* ── Главная функция инициализации ── */
+function initGraph() {
+    if (graphLoaded) return;
+
+    const loader = document.getElementById('graphLoader');
+    const svg    = document.getElementById('graphSVG');
+    loader.style.display = 'flex';
+    svg.style.display    = 'none';
+
+    fetch('/cabinet/api/referrals/tree/')
+        .then(r => r.json())
+        .then(data => {
+            // Данных нет или пустые
+            if (!data.nodes || data.nodes.length === 0) {
+                throw new Error('Структура пуста');
+            }
+
+            const root = buildTree(data.nodes, data.edges || []);
+            if (!root) throw new Error('Не удалось построить дерево');
+
+            // Размеры холста
+            const leaves = countLeaves(root);
+            const maxLvl = Math.max(...data.nodes.map(n => n.level || 0));
+            const gapX   = 130;
+            const totalW = Math.max(900,  (leaves + 1) * gapX);
+            const totalH = Math.max(400,  (maxLvl + 2) * (CARD_H + GAP_Y));
+
+            // Раскладываем
+            layoutTree(root, { cursor: 0, gapX: totalW / (leaves + 1), startY: 50 });
+
+            // Рисуем
+            svg.setAttribute('width',   totalW);
+            svg.setAttribute('height',  totalH);
+            svg.setAttribute('viewBox', `0 0 ${totalW} ${totalH}`);
+            svg.style.background = '#0d0f14';
+            svg.innerHTML = '';
+
+            const linksG = svgEl('g', {});
+            drawLinks(root, linksG);
+            svg.appendChild(linksG);
+
+            const nodesG = svgEl('g', {});
+            drawNodes(root, nodesG);
+            svg.appendChild(nodesG);
+
+            loader.style.display = 'none';
+            svg.style.display    = 'block';
+            graphLoaded = true;
+
+            // Зум
+            let scale = 1;
+            document.getElementById('btnZoomIn').onclick = () => {
+                scale = Math.min(scale * 1.25, 4);
+                svg.style.transform = `scale(${scale})`;
+                svg.style.transformOrigin = 'top left';
+            };
+            document.getElementById('btnZoomOut').onclick = () => {
+                scale = Math.max(scale * 0.8, 0.25);
+                svg.style.transform = `scale(${scale})`;
+                svg.style.transformOrigin = 'top left';
+            };
+            document.getElementById('btnFit').onclick = () => {
+                scale = 1;
+                svg.style.transform = '';
+                document.getElementById('graphContainer').scrollTo(0, 0);
+            };
+        })
+        .catch(err => {
+            loader.innerHTML = `
+                <div style="text-align:center;">
+                    <i class="fas fa-exclamation-triangle fa-2x" style="color:#ef4444; margin-bottom:10px;"></i>
+                    <p style="color:#94a3b8; margin:8px 0;">${err.message || 'Не удалось загрузить граф'}</p>
+                    <button class="btn btn-sm btn-dark border-secondary mt-2"
+                            onclick="graphLoaded=false; initGraph()">
+                        <i class="fas fa-redo me-1"></i>Попробовать снова
+                    </button>
+                </div>`;
+        });
 }
 
 /* ── Тултип ── */
 const graphTooltip = document.getElementById('graphTooltip');
 
-function showGraphTooltip(e, n, status) {
+function showGraphTooltip(e, n) {
     const fmt = v => (v === undefined || v === null || v === '') ? '—' : v;
     graphTooltip.innerHTML = `
         <div class="tt-title">Пользователь #${n.id}</div>
@@ -787,9 +726,6 @@ function showGraphTooltip(e, n, status) {
         <div class="tt-row"><span class="tt-label">GO (групповой объём)</span><span class="tt-val">${fmt(n.group_volume)}</span></div>
         <div class="tt-row"><span class="tt-label">Рефералов</span><span class="tt-val">${fmt(n.total_referrals)}</span></div>
         <div class="tt-row"><span class="tt-label">Статус</span><span class="tt-val">${n.active ? '✅ Активный' : '⚪ Неактивный'}</span></div>
-        ${status.personal_bonus != null ? `<div class="tt-row"><span class="tt-label">Личный бонус</span><span class="tt-val">${status.personal_bonus}</span></div>` : ''}
-        ${status.structure_bonus != null ? `<div class="tt-row"><span class="tt-label">Структурный бонус</span><span class="tt-val">${status.structure_bonus}</span></div>` : ''}
-        ${status.total_income != null ? `<div class="tt-row"><span class="tt-label">Итого доход</span><span class="tt-val">${Number(status.total_income).toLocaleString('ru')}</span></div>` : ''}
         ${n.partner_level ? `<div class="tt-qual">${n.partner_level}</div>` : ''}
     `;
     graphTooltip.style.display = 'block';
