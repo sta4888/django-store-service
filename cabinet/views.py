@@ -500,9 +500,9 @@ def get_referral_details(request, user_id):
         # Проверяем, что пользователь существует
         db_user = CustomUser.objects.get(user_id=user_id)
         
-        # Проверяем, что это реферал текущего пользователя
-        if db_user.referrer != request.user:
-            return JsonResponse({'error': True, 'message': 'Доступ запрещен'}, status=403)
+        # # Проверяем, что это реферал текущего пользователя
+        # if db_user.referrer != request.user:
+        #     return JsonResponse({'error': True, 'message': 'Доступ запрещен'}, status=403)
         
         # Получаем данные из API
         try:
