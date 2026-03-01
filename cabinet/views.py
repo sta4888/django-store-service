@@ -311,6 +311,7 @@ def get_referrals_json(request):
         )
         response.raise_for_status()
         api_data = response.json()
+        print(f"api_data.get('error') -- {api_data.get('error')}")
         
         if api_data.get('error'):
             return JsonResponse({
