@@ -1,595 +1,1009 @@
-import json
-import logging
-
-import requests
-from django.core.cache import cache
-from django.core.exceptions import PermissionDenied
-from django.core.paginator import Paginator
-from core.settings import FASTAPI_SERVICE_URL
-# from .tasks import update_user_stats_cache
-from django.http import JsonResponse
-from django.shortcuts import render
-from django.contrib.auth.decorators import login_required
-from django.db.models import Sum
-from .models import Purchase, News
-from datetime import datetime, timedelta
-from accounts.models import CustomUser
-
-from .services.fastapi_service import FastAPIService
-
-logger = logging.getLogger(__name__)
+{% extends 'base.html' %}
+{% load static %}
 
 
-@login_required
-def dashboard_view(request):
-    stats = {}
-    # user_id = request.user.username
-    # cache_key = f"user:stats:{user_id}"
-    # stats = cache.get(cache_key)  # быстрое чтение, не блокирующее
-    #
-    # if stats is None:
-    #     # стартуем фоновую задачу, но не ждём её результата
-    #     update_user_stats_cache.delay(user_id)
+{% block title %}Моя структура | EVERON{% endblock %}
 
-    return render(
-        request,
-        "cabinet/dashboard.html",
-        {
-            "user_stats": stats or {},  # пустой словарь пока нет данных
-            "loading": stats is None,
+{% block content %}
+<div class="container py-5">
+    <div class="row">
+        <!-- Боковое меню -->
+        <div class="col-lg-3 mb-4">
+            {% include 'includes/sidebar.html' %}
+        </div>
+        
+        <!-- Основная информация -->
+        <div class="col-lg-9">
+            <!-- Заголовок и статистика -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1><i class="fas fa-sitemap me-2"></i> Моя структура</h1>
+                <div class="text-end">
+                    <div class="text-muted small">ID партнера: {{ user.username }}</div>
+                    <div class="text-muted small">Всего рефералов: {{ total_referrals }}</div>
+                </div>
+            </div>
+
+            <!-- Статистика карточки -->
+            <div class="stats-grid mb-4">
+                <div class="stat-card">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="stat-label">Всего рефералов</div>
+                            <div class="stat-value">{{ total_referrals }}</div>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="fas fa-users fa-2x" style="color: var(--color-green);"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="stat-label">Активных рефералов</div>
+                            <div class="stat-value">{{ active_referrals }}</div>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="fas fa-user-check fa-2x" style="color: var(--color-blue);"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="stat-label">Групповой объем</div>
+                            <div class="stat-value">{{ group_volume }} бал</div>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="fas fa-chart-line fa-2x" style="color: var(--color-orange);"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===================== ВКЛАДКИ ===================== -->
+            <ul class="nav nav-tabs mb-0" id="structureTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="list-tab" data-bs-toggle="tab"
+                            data-bs-target="#list-panel" type="button" role="tab"
+                            aria-controls="list-panel" aria-selected="true">
+                        <i class="fas fa-list me-1"></i> Список
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="graph-tab" data-bs-toggle="tab"
+                            data-bs-target="#graph-panel" type="button" role="tab"
+                            aria-controls="graph-panel" aria-selected="false">
+                        <i class="fas fa-project-diagram me-1"></i> Граф структуры
+                    </button>
+                </li>
+            </ul>
+
+            <div class="tab-content border border-top-0 rounded-bottom bg-white" id="structureTabContent">
+
+                <!-- ========== ВКЛАДКА: СПИСОК ========== -->
+                <div class="tab-pane fade show active p-0" id="list-panel" role="tabpanel">
+
+                    <!-- Фильтры и поиск -->
+                    <div class="card border-0 border-bottom rounded-0">
+                        <div class="card-body">
+                            <div class="row align-items-center">
+                                <div class="col-md-8">
+                                    <div class="filter-tabs mb-3 mb-md-0">
+                                        <button class="btn btn-sm btn-outline-accent active" data-level="1">
+                                            1-й уровень <span class="badge bg-accent ms-1">{{ direct_referrals.paginator.count }}</span>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary" data-level="2">
+                                            2-й уровень
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary" data-level="3">
+                                            3-й уровень
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="input-group">
+                                        <input type="text" class="form-control form-control-sm" 
+                                               id="searchReferrals" placeholder="Поиск...">
+                                        <button class="btn btn-outline-secondary btn-sm" type="button">
+                                            <i class="fas fa-search"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Таблица рефералов -->
+                    <div class="card border-0 rounded-0 rounded-bottom">
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th class="ps-4">ID</th>
+                                            <th>Партнер</th>
+                                            <th>Контакты</th>
+                                            <th>Регистрация</th>
+                                            <th>Личный объем</th>
+                                            <th>Уровень</th>
+                                            <th>Рефералов</th>
+                                            <th class="pe-4">Действия</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for referral in direct_referrals %}
+                                        <tr>
+                                            <td class="ps-4 fw-bold">{{ referral.user_id }}</td>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="avatar-sm me-3">
+                                                        <div class="avatar-title bg-light text-accent rounded-circle">
+                                                            {{ referral.first_name|first|upper }}{{ referral.last_name|first|upper }}
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <div class="fw-medium">{{ referral.get_full_name|default:referral.username }}</div>
+                                                        <small class="text-muted">
+                                                            {% if referral.user_type == 'store' %}
+                                                                <i class="fas fa-store fa-xs me-1"></i>Магазин
+                                                            {% else %}
+                                                                <i class="fas fa-user fa-xs me-1"></i>Партнер
+                                                            {% endif %}
+                                                        </small>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                {% if referral.email %}
+                                                <div class="small">
+                                                    <i class="fas fa-envelope fa-xs me-1 text-muted"></i>
+                                                    {{ referral.email|truncatechars:20 }}
+                                                </div>
+                                                {% endif %}
+                                                {% if referral.phone %}
+                                                <div class="small">
+                                                    <i class="fas fa-phone fa-xs me-1 text-muted"></i>
+                                                    {{ referral.phone }}
+                                                </div>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <div class="small">{{ referral.date_joined|date:"d.m.Y" }}</div>
+                                                <div class="text-muted extra-small">{{ referral.date_joined|timesince }} назад</div>
+                                            </td>
+                                            <td>
+                                                <div class="fw-medium">{{ referral.personal_volume }} бал</div>
+                                                <div class="text-muted extra-small">Группа: {{ referral.group_volume }} бал</div>
+                                            </td>
+                                            <td>
+                                                <span class="badge {% if referral.partner_level == 'Начинающий' %}bg-secondary{% else %}bg-accent{% endif %}">
+                                                    {{ referral.partner_level }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <i class="fas fa-users fa-xs text-muted me-2"></i>
+                                                    <span class="fw-medium">{{ referral.total_referrals }}</span>
+                                                </div>
+                                            </td>
+                                            <td class="pe-4">
+                                                <div class="btn-group btn-group-sm">
+                                                    <button type="button" class="btn btn-outline-secondary" 
+                                                            data-bs-toggle="tooltip" title="Просмотр деталей"
+                                                            onclick="showReferralDetails('{{ referral.user_id }}')">
+                                                        <i class="fas fa-eye"></i>
+                                                    </button>
+                                                    <button type="button" class="btn btn-outline-secondary"
+                                                            data-bs-toggle="tooltip" title="Написать сообщение">
+                                                        <i class="fas fa-envelope"></i>
+                                                    </button>
+                                                    <button type="button" class="btn btn-outline-secondary"
+                                                            data-bs-toggle="tooltip" title="Перейти в структуру"
+                                                            onclick="window.location.href='?parent={{ referral.user_id }}'">
+                                                        <i class="fas fa-external-link-alt"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr>
+                                            <td colspan="8" class="text-center py-5">
+                                                <div class="empty-state">
+                                                    <div class="empty-icon mb-3">
+                                                        <i class="fas fa-users-slash fa-3x text-muted"></i>
+                                                    </div>
+                                                    <h5 class="text-muted">У вас пока нет рефералов</h5>
+                                                    <p class="text-muted mb-4">Приглашайте друзей и партнеров, чтобы построить свою команду!</p>
+                                                    <button class="btn btn-gradient" onclick="shareReferralLink()">
+                                                        <i class="fas fa-share-alt me-2"></i>Поделиться реферальной ссылкой
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Пагинация -->
+                    {% if direct_referrals.has_other_pages %}
+                    <nav class="mt-4">
+                        <ul class="pagination justify-content-center">
+                            {% if direct_referrals.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ direct_referrals.previous_page_number }}">
+                                    <i class="fas fa-chevron-left"></i>
+                                </a>
+                            </li>
+                            {% endif %}
+                            {% for i in direct_referrals.paginator.page_range %}
+                                {% if direct_referrals.number == i %}
+                                <li class="page-item active"><span class="page-link">{{ i }}</span></li>
+                                {% else %}
+                                <li class="page-item"><a class="page-link" href="?page={{ i }}">{{ i }}</a></li>
+                                {% endif %}
+                            {% endfor %}
+                            {% if direct_referrals.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ direct_referrals.next_page_number }}">
+                                    <i class="fas fa-chevron-right"></i>
+                                </a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
+
+                </div>
+                <!-- /ВКЛАДКА СПИСОК -->
+
+
+                <!-- ========== ВКЛАДКА: ГРАФ ========== -->
+                <div class="tab-pane fade" id="graph-panel" role="tabpanel">
+
+                    <!-- Панель управления графом -->
+                    <div class="graph-toolbar d-flex align-items-center gap-2 p-3 border-bottom"
+                         style="background:#0d0f14; border-color:#2a2d38 !important;">
+
+                        <div class="d-flex align-items-center gap-2 me-auto">
+                            <button class="btn btn-sm btn-dark border-secondary" id="btnZoomIn" title="Приблизить">
+                                <i class="fas fa-search-plus"></i>
+                            </button>
+                            <button class="btn btn-sm btn-dark border-secondary" id="btnZoomOut" title="Отдалить">
+                                <i class="fas fa-search-minus"></i>
+                            </button>
+                            <button class="btn btn-sm btn-dark border-secondary" id="btnFit" title="По размеру экрана">
+                                <i class="fas fa-compress-arrows-alt"></i>
+                            </button>
+                        </div>
+
+                        <!-- Легенда -->
+                        <div class="d-flex align-items-center gap-3 small">
+                            <span style="color:#64748b;">
+                                <span class="tree-legend-dot" style="background:#3a4060;"></span> LO &lt; 100
+                            </span>
+                            <span style="color:#64748b;">
+                                <span class="tree-legend-dot" style="background:#2563eb;"></span> LO 100–499
+                            </span>
+                            <span style="color:#64748b;">
+                                <span class="tree-legend-dot" style="background:#16a34a;"></span> LO 500–999
+                            </span>
+                            <span style="color:#64748b;">
+                                <span class="tree-legend-dot" style="background:#d97706;"></span> LO 1000+
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Контейнер графа — тёмный фон -->
+                    <div id="graphContainer"
+                         style="height:600px; overflow:auto; background:#0d0f14; position:relative; border-radius:0 0 0.375rem 0.375rem;">
+
+                        <!-- Loader -->
+                        <div id="graphLoader"
+                             style="display:flex; flex-direction:column; align-items:center;
+                                    justify-content:center; height:100%; gap:16px;">
+                            <div style="width:40px;height:40px;border:3px solid #2a2d38;
+                                        border-top-color:#4f9cf9;border-radius:50%;
+                                        animation:treeSpinner 0.8s linear infinite;"></div>
+                            <p style="color:#64748b; font-family:'JetBrains Mono',monospace;
+                                      font-size:12px; margin:0;">Загрузка структуры...</p>
+                        </div>
+
+                        <!-- SVG граф -->
+                        <svg id="graphSVG" style="display:none; font-family:'JetBrains Mono',monospace;"></svg>
+                    </div>
+
+                    <!-- Тултип -->
+                    <div id="graphTooltip"></div>
+
+                </div>
+                <!-- /ВКЛАДКА ГРАФ -->
+
+            </div>
+            <!-- /tab-content -->
+
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно для деталей реферала -->
+<div class="modal fade" id="referralModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Детальная информация</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="referralDetails">
+                <div class="text-center py-5">
+                    <div class="spinner-border text-accent" role="status">
+                        <span class="visually-hidden">Загрузка...</span>
+                    </div>
+                    <p class="mt-3 text-muted">Загрузка данных...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+
+{% block extra_css %}
+<style>
+/* ── Общие стили страницы ── */
+.avatar-sm { width: 40px; height: 40px; }
+.avatar-title {
+    width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 600;
+}
+.extra-small { font-size: 0.75rem; }
+.empty-state { max-width: 400px; margin: 0 auto; text-align: center; }
+.empty-icon { opacity: 0.5; }
+.filter-tabs .btn { margin-right: 8px; margin-bottom: 8px; }
+.filter-tabs .btn.active {
+    background-color: var(--color-accent);
+    color: white;
+    border-color: var(--color-accent);
+}
+.table-hover tbody tr:hover { background-color: rgba(var(--color-accent-rgb), 0.05); }
+.btn-group-sm .btn { padding: 0.25rem 0.5rem; }
+
+/* ── Вкладки ── */
+.nav-tabs .nav-link { color: var(--color-gray-600); font-weight: 500; }
+.nav-tabs .nav-link.active {
+    color: var(--color-accent);
+    border-bottom-color: white;
+}
+
+/* ── Граф — тёмная тема ── */
+@keyframes treeSpinner { to { transform: rotate(360deg); } }
+
+.tree-legend-dot {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 2px;
+    margin-right: 4px;
+    vertical-align: middle;
+}
+
+/* Тултип */
+#graphTooltip {
+    position: fixed;
+    z-index: 9999;
+    background: #1e2433;
+    border: 1px solid #2a2d38;
+    border-radius: 10px;
+    padding: 14px 16px;
+    min-width: 210px;
+    pointer-events: none;
+    display: none;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    font-size: 12px;
+    font-family: 'Manrope', system-ui, sans-serif;
+    color: #e2e8f0;
+}
+#graphTooltip .tt-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    color: #4f9cf9;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #2a2d38;
+    padding-bottom: 8px;
+}
+#graphTooltip .tt-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    margin: 4px 0;
+}
+#graphTooltip .tt-label { color: #64748b; font-size: 11px; }
+#graphTooltip .tt-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    font-size: 11px;
+}
+#graphTooltip .tt-qual {
+    text-align: center;
+    margin-top: 8px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    background: rgba(79,156,249,0.15);
+    color: #4f9cf9;
+}
+
+/* ── Детали реферала (модальное) ── */
+#referralDetails .detail-row {
+    display: flex; margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color, #dee2e6);
+}
+#referralDetails .detail-label { font-weight: 600; width: 180px; color: #6c757d; }
+#referralDetails .detail-value { flex: 1; }
+
+/* Уровни в таблице */
+.level-2 td:first-child { padding-left: 50px !important; position: relative; }
+.level-2 td:first-child::before { content: "↳"; position: absolute; left: 25px; color: #adb5bd; }
+.level-3 td:first-child { padding-left: 70px !important; position: relative; }
+.level-3 td:first-child::before { content: "↳"; position: absolute; left: 45px; color: #adb5bd; }
+</style>
+{% endblock %}
+
+
+{% block extra_js %}
+<script>
+/* ============================================================
+   СПИСОК РЕФЕРАЛОВ
+   ============================================================ */
+document.addEventListener('DOMContentLoaded', function () {
+
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el =>
+        new bootstrap.Tooltip(el)
+    );
+
+    document.querySelectorAll('.filter-tabs .btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+            document.querySelectorAll('.filter-tabs .btn').forEach(b => {
+                b.classList.remove('active', 'btn-accent');
+                b.classList.add('btn-outline-secondary');
+            });
+            this.classList.remove('btn-outline-secondary');
+            this.classList.add('active', 'btn-accent');
+            loadReferralsByLevel(this.dataset.level);
+        });
+    });
+
+    let searchTimeout;
+    document.getElementById('searchReferrals').addEventListener('input', function (e) {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => filterTable(e.target.value.toLowerCase()), 300);
+    });
+
+    // Ленивая загрузка графа при открытии вкладки
+    document.getElementById('graph-tab').addEventListener('shown.bs.tab', function () {
+        initGraph();
+    });
+});
+
+
+/* ============================================================
+   ГРАФ — тёмная тема, карточки с LO/GO, тултипы
+   ============================================================ */
+
+const CARD_W  = 110;
+const CARD_H  = 68;
+const GAP_Y   = 110;
+
+let graphLoaded = false;
+
+function initGraph() {
+    if (graphLoaded) return;
+
+    const loader = document.getElementById('graphLoader');
+    const svg    = document.getElementById('graphSVG');
+
+    loader.style.display = 'flex';
+    svg.style.display    = 'none';
+
+    // Используем существующий Django-эндпоинт дерева
+    fetch('/cabinet/api/referrals/tree/')
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) throw new Error(data.message || 'Ошибка API');
+
+            // Преобразуем nodes/edges → иерархическое дерево
+            const tree = buildTree(data.nodes, data.edges);
+            if (!tree) throw new Error('Нет данных');
+
+            // Параллельно запрашиваем /status для каждого узла
+            const allNodes = data.nodes;
+            const statusPromises = allNodes.map(n =>
+                fetch(`/cabinet/api/referrals/${n.id}/details/`)
+                    .then(r => r.json())
+                    .catch(() => null)
+            );
+
+            Promise.all(statusPromises).then(statuses => {
+                const statusMap = {};
+                allNodes.forEach((n, i) => {
+                    statusMap[n.id] = statuses[i] || {};
+                });
+                renderDarkTree(tree, data.nodes, data.edges, statusMap);
+                graphLoaded = true;
+            });
+        })
+        .catch(err => {
+            loader.innerHTML = `
+                <div style="text-align:center; color:#ef4444;">
+                    <i class="fas fa-exclamation-triangle fa-2x" style="margin-bottom:10px;"></i>
+                    <p style="color:#94a3b8;">${err.message || 'Не удалось загрузить граф'}</p>
+                    <button class="btn btn-sm btn-dark border-secondary mt-2"
+                            onclick="graphLoaded=false; initGraph()">
+                        <i class="fas fa-redo me-1"></i>Попробовать снова
+                    </button>
+                </div>`;
+        });
+}
+
+/* ── Строим иерархическое дерево из плоских nodes + edges ── */
+function buildTree(nodes, edges) {
+    const map = {};
+    nodes.forEach(n => { map[n.id] = { ...n, team: [] }; });
+    const childIds = new Set();
+    edges.forEach(e => {
+        if (map[e.from] && map[e.to]) {
+            map[e.from].team.push(map[e.to]);
+            childIds.add(e.to);
         }
-    )
+    });
+    // Корень — тот, кто не является ничьим потомком
+    const root = nodes.find(n => !childIds.has(n.id));
+    return root ? map[root.id] : null;
+}
 
+/* ── Layout: позиционирование узлов ── */
+function layoutTree(node, state) {
+    node._y = state.startY + node.level * (CARD_H + GAP_Y);
 
-@login_required
-def profile_view(request):
-    return render(request, 'cabinet/profile.html')
-
-
-@login_required
-def purchases_view(request):
-    purchases = Purchase.objects.filter(user=request.user).order_by('-date')
-    return render(request, 'cabinet/purchases.html', {'purchases': purchases})
-
-
-@login_required
-def finance_view(request):
-    return render(request, 'cabinet/finance.html')
-
-
-# @login_required
-# def refresh_stats(request):
-#     """Обновление статистики по AJAX запросу"""
-#     if request.method == 'POST':
-#         try:
-#             data = json.loads(request.body)
-#             force_refresh = data.get('force', False)
-#         except:
-#             force_refresh = False
-#
-#     service = FastAPIService()
-#     user_stats = service.get_user_stats(request.user.username, force_refresh=force_refresh)
-#
-#     if user_stats is None:
-#         # Запускаем асинхронное обновление
-#         task = update_user_stats_cache.delay(request.user.username)
-#         return JsonResponse({
-#             'status': 'updating',
-#             'message': 'Данные обновляются...',
-#             'task_id': str(task.id)
-#         })
-#
-#     return JsonResponse({
-#         'status': 'success',
-#         'data': user_stats,
-#         'refreshed': True
-#     })
-#
-#
-# @login_required
-# def get_stats_json(request):
-#     user_id = request.user.username
-#     cache_key = f"user:stats:{user_id}"
-#
-#     stats = cache.get(cache_key)
-#
-#     if not stats:
-#         update_user_stats_cache.delay(user_id)
-#         return JsonResponse(
-#             {"status": "loading"},
-#             status=202
-#         )
-#
-#     return JsonResponse(
-#         {"status": "ok", "data": stats}
-#     )
-
-
-@login_required
-def get_user_data(request):
-    user_id = request.user.username
-    try:
-        r = requests.get(
-            f"{FASTAPI_SERVICE_URL}/user/users/{user_id}/status",
-            timeout=5
-        )
-        r.raise_for_status()
-    except requests.RequestException as e:
-        return JsonResponse(
-            {"error": str(e)},
-            status=503
-        )
-
-    return JsonResponse(r.json(), safe=False)
-
-
-
-@login_required
-def add_user_lo(request):
-    # user_id = request.user.username
-
-    # Получаем данные из POST запроса
-    if request.method == 'POST':
-        try:
-            # Пытаемся получить данные из JSON
-            data = json.loads(request.body)
-        except json.JSONDecodeError:
-            # Если не JSON, пробуем получить из формы
-            data = request.POST.dict()
-
-        lo_amount = data.get('lo')
-        user_id = data.get('user_id')
-
-        if not lo_amount:
-            return JsonResponse(
-                {"error": "Параметр 'lo' не указан"},
-                status=400
-            )
-
-        try:
-            payload = {"lo": float(lo_amount)}
-
-            r = requests.post(
-                f"{FASTAPI_SERVICE_URL}/user/users/{user_id}/lo/add",
-                json=payload,
-                timeout=5
-            )
-            r.raise_for_status()
-
-            return JsonResponse(r.json(), safe=False)
-
-        except ValueError:
-            return JsonResponse(
-                {"error": "Параметр 'lo' должен быть числом"},
-                status=400
-            )
-        except requests.RequestException as e:
-            return JsonResponse(
-                {"error": str(e)},
-                status=503
-            )
-
-    # Если метод не POST
-    return JsonResponse(
-        {"error": "Метод не поддерживается. Используйте POST."},
-        status=405
-    )
-
-
-@login_required
-def sub_user_lo(request):
-    # user_id = request.user.username
-
-    # Получаем данные из POST запроса
-    if request.method == 'POST':
-        try:
-            # Пытаемся получить данные из JSON
-            data = json.loads(request.body)
-        except json.JSONDecodeError:
-            # Если не JSON, пробуем получить из формы
-            data = request.POST.dict()
-
-        lo_amount = data.get('lo')
-        user_id = data.get('user_id')
-
-        if not lo_amount:
-            return JsonResponse(
-                {"error": "Параметр 'lo' не указан"},
-                status=400
-            )
-
-        try:
-            payload = {"lo": float(lo_amount)}
-
-            r = requests.post(
-                f"{FASTAPI_SERVICE_URL}/user/users/{user_id}/lo/subtract",
-                json=payload,
-                timeout=5
-            )
-            r.raise_for_status()
-
-            return JsonResponse(r.json(), safe=False)
-
-        except ValueError:
-            return JsonResponse(
-                {"error": "Параметр 'lo' должен быть числом"},
-                status=400
-            )
-        except requests.RequestException as e:
-            return JsonResponse(
-                {"error": str(e)},
-                status=503
-            )
-
-    # Если метод не POST
-    return JsonResponse(
-        {"error": "Метод не поддерживается. Используйте POST."},
-        status=405
-    )
-
-
-@login_required
-def get_user_team(request):
-    user_id = request.user.username
-    try:
-        r = requests.get(
-            f"{FASTAPI_SERVICE_URL}/user/users/{user_id}/structure",
-            timeout=5
-        )
-        r.raise_for_status()
-    except requests.RequestException as e:
-        return JsonResponse(
-            {"error": str(e)},
-            status=503
-        )
-
-    return JsonResponse(r.json(), safe=False)
-
-
-@login_required
-def api_test_page(request):
-    """Страница для тестирования API"""
-    return render(request, 'cabinet/admin_api.html')
-
-
-@login_required
-def admin_panel(request):
-    """Админ-панель для магазинов и администраторов"""
-    if not request.user.can_access_admin:
-        raise PermissionDenied("У вас нет доступа к админ-панели")
-
-    return render(request, 'cabinet/admin_panel.html')
-
-
-@login_required
-def structure_view(request):
-    """Страница структуры рефералов пользователя"""
-    user = request.user
-    
-    # Получаем рефералов первого уровня
-    direct_referrals = CustomUser.objects.filter(
-        referrer=user
-    ).select_related('referrer').order_by('-date_joined')
-    
-    # Пагинация
-    paginator = Paginator(direct_referrals, 20)  # 20 записей на страницу
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    
-    # Получаем общую статистику
-    total_referrals = user.total_referrals
-    active_referrals = user.active_referrals
-    group_volume = user.group_volume
-    
-    context = {
-        'direct_referrals': page_obj,
-        'total_referrals': total_referrals,
-        'active_referrals': active_referrals,
-        'group_volume': group_volume,
+    if (!node.team || node.team.length === 0) {
+        state.cursor += state.gapX;
+        node._x = state.cursor;
+        return;
     }
-    
-    return render(request, 'cabinet/structure.html', context)
+    node.team.forEach(c => layoutTree(c, state));
+    node._x = (node.team[0]._x + node.team[node.team.length - 1]._x) / 2;
+}
 
+/* ── Считаем количество листьев ── */
+function countLeaves(node) {
+    if (!node.team || node.team.length === 0) return 1;
+    return node.team.reduce((s, c) => s + countLeaves(c), 0);
+}
 
-# Дополнительная функция для AJAX-загрузки рефералов (по желанию)
-@login_required
-def get_referrals_json(request):
-    """Получение списка рефералов в формате JSON с данными из API"""
-    user = request.user
-    level = request.GET.get('level', '1')
-    
-    try:
-        level = int(level)
-    except ValueError:
-        level = 1
-    
-    try:
-        # Получаем структуру из FastAPI
-        response = requests.get(
-            f"{FASTAPI_SERVICE_URL}/user/users/{user.username}/structure",
-            timeout=5
-        )
-        response.raise_for_status()
-        api_data = response.json()
-        
-        if api_data.get('error'):
-            return JsonResponse({
-                'error': True,
-                'message': api_data.get('error_msg', 'Ошибка при получении данных')
-            }, status=500)
-            
-        structure_data = api_data.get('data', {})
-        team_members = structure_data.get('team', [])
-        
-    except requests.RequestException as e:
-        logger.error(f"Ошибка API при получении структуры: {e}")
-        return JsonResponse({
-            'error': True,
-            'message': str(e)
-        }, status=503)
-    
-    # Получаем данные из БД
-    referral_user_ids = [str(member.get('user_id')) for member in team_members]
-    db_referrals = CustomUser.objects.filter(user_id__in=referral_user_ids)
-    db_referrals_dict = {str(ref.user_id): ref for ref in db_referrals}
-    
-    # Обрабатываем только первый уровень
-    if level == 1:
-        referrals_data = []
-        for api_member in team_members:
-            user_id = str(api_member.get('user_id'))
-            db_data = db_referrals_dict.get(user_id)
-            
-            if db_data:
-                member_data = {
-                    'id': user_id,
-                    'name': db_data.get_full_name() or db_data.username,
-                    'email': db_data.email,
-                    'phone': db_data.phone,
-                    'country': db_data.country,
-                    'registration_date': db_data.date_joined.strftime('%d.%m.%Y'),
-                    'personal_volume': float(api_member.get('lo', 0)),  # Из API
-                    'group_volume': float(db_data.group_volume),  # Из БД
-                    'partner_level': db_data.partner_level,
-                    'user_type': db_data.user_type,
-                    'total_referrals': db_data.total_referrals,
-                    'active_referrals': db_data.active_referrals,
-                    'earnings': float(db_data.earnings),
-                    'team_count': len(api_member.get('team', [])),
-                }
-                referrals_data.append(member_data)
-        
-        return JsonResponse({
-            'level': level,
-            'referrals': referrals_data,
-            'total_count': len(referrals_data),
-            'error': False
-        })
-    
-    # Для второго уровня и глубже (рекурсивно)
-    elif level > 1:
-        all_referrals_data = []
-        
-        def get_deep_referrals(members, current_level, max_level):
-            if current_level > max_level:
-                return []
-            
-            referrals_data = []
-            for member in members:
-                user_id = str(member.get('user_id'))
-                
-                try:
-                    # Получаем структуру для каждого члена команды
-                    member_response = requests.get(
-                        f"{FASTAPI_SERVICE_URL}/user/users/{user_id}/structure",
-                        timeout=3
-                    )
-                    if member_response.status_code == 200:
-                        member_data = member_response.json()
-                        if not member_data.get('error'):
-                            # Получаем данные из БД
-                            try:
-                                db_data = CustomUser.objects.get(user_id=user_id)
-                            except CustomUser.DoesNotExist:
-                                db_data = None
-                            
-                            member_info = {
-                                'id': user_id,
-                                'level': current_level,
-                                'personal_volume': float(member.get('lo', 0)),
-                                'team_count': len(member.get('team', [])),
-                            }
-                            
-                            if db_data:
-                                member_info.update({
-                                    'name': db_data.get_full_name() or db_data.username,
-                                    'email': db_data.email,
-                                    'phone': db_data.phone,
-                                    'registration_date': db_data.date_joined.strftime('%d.%m.%Y'),
-                                    'group_volume': float(db_data.group_volume),
-                                    'partner_level': db_data.partner_level,
-                                })
-                            
-                            referrals_data.append(member_info)
-                            
-                            # Рекурсивно получаем команду
-                            if current_level < max_level:
-                                sub_team = member_data.get('data', {}).get('team', [])
-                                referrals_data.extend(
-                                    get_deep_referrals(sub_team, current_level + 1, max_level)
-                                )
-                except:
-                    continue
-            
-            return referrals_data
-        
-        # Начинаем рекурсию с команды первого уровня
-        deep_referrals = get_deep_referrals(team_members, 2, level)
-        
-        return JsonResponse({
-            'level': level,
-            'referrals': deep_referrals,
-            'total_count': len(deep_referrals),
-            'error': False
-        })
-    
-    return JsonResponse({
-        'level': level,
-        'referrals': [],
-        'total_count': 0,
-        'error': False
-    })
+/* ── Цветовая схема по LO ── */
+function loStyle(lo) {
+    if (lo >= 1000) return { fill: '#2a1e06', stroke: '#d97706', textColor: '#fbbf24' };
+    if (lo >= 500)  return { fill: '#0b1f12', stroke: '#16a34a', textColor: '#4ade80' };
+    if (lo >= 100)  return { fill: '#0c1829', stroke: '#2563eb', textColor: '#60a5fa' };
+    return              { fill: '#14182a', stroke: '#3a4060', textColor: '#94a3b8' };
+}
 
+/* ── Создание SVG-элемента ── */
+function svgEl(tag, attrs) {
+    const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v));
+    return el;
+}
 
+/* ── Рендер дерева ── */
+function renderDarkTree(root, allNodes, edges, statusMap) {
+    const loader = document.getElementById('graphLoader');
+    const svg    = document.getElementById('graphSVG');
 
-@login_required
-def referral_tree_api(request):
-    """
-    Возвращает дерево рефералов для текущего пользователя.
-    Без учёта глубины — загружает всю структуру целиком.
-    """
-    nodes = []
-    edges = []
-    visited = set()  # защита от циклов
+    const leaves = countLeaves(root);
+    const maxLvl = Math.max(...allNodes.map(n => n.level || 0));
 
-    def get_short_name(user):
-        parts = [user.first_name, user.last_name]
-        name = ' '.join(p for p in parts if p).strip()
-        return name or user.username
+    const gapX  = Math.max(130, 130);
+    const totalW = Math.max(1000, (leaves + 1) * gapX);
+    const totalH = Math.max(500,  (maxLvl + 2) * (CARD_H + GAP_Y));
 
-    def get_full_name(user):
-        parts = [user.last_name, user.first_name, getattr(user, 'middle_name', '')]
-        name = ' '.join(p for p in parts if p).strip()
-        return name or user.username
+    // Layout
+    const state = { cursor: 0, gapX: totalW / (leaves + 1), startY: 50 };
+    layoutTree(root, state);
 
-    def traverse(user, level):
-        if user.pk in visited:
-            return
-        visited.add(user.pk)
+    // Настраиваем SVG
+    svg.setAttribute('width', totalW);
+    svg.setAttribute('height', totalH);
+    svg.setAttribute('viewBox', `0 0 ${totalW} ${totalH}`);
+    svg.style.background = '#0d0f14';
+    svg.innerHTML = '';
 
-        nodes.append({
-            'id':              user.user_id,
-            'label':           get_short_name(user),
-            'title':           get_full_name(user),   # для тултипа
-            'level':           level,
-            'active':          getattr(user, 'is_active', True),
-            'personal_volume': float(getattr(user, 'personal_volume', 0) or 0),
-            'group_volume':    float(getattr(user, 'group_volume', 0) or 0),
-            'partner_level':   getattr(user, 'partner_level', ''),
-            'total_referrals': getattr(user, 'total_referrals', 0),
-            'user_type':       getattr(user, 'user_type', 'partner'),
-        })
+    // Слой рёбер
+    const linksG = svgEl('g', {});
+    edges.forEach(e => {
+        const fromNode = allNodes.find(n => n.id === e.from);
+        const toNode   = allNodes.find(n => n.id === e.to);
+        if (!fromNode || !toNode) return;
 
-        # Загружаем прямых рефералов одним запросом
-        referrals = CustomUser.objects.filter(referrer=user)
+        const x1 = fromNode._x, y1 = fromNode._y + CARD_H / 2;
+        const x2 = toNode._x,   y2 = toNode._y   - CARD_H / 2;
+        const my = (y1 + y2) / 2;
 
-        for referral in referrals:
-            edges.append({'from': user.user_id, 'to': referral.user_id})
-            traverse(referral, level + 1)
+        const path = svgEl('path', {
+            d: `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`,
+            fill: 'none',
+            stroke: '#2a2d38',
+            'stroke-width': '1.5'
+        });
+        linksG.appendChild(path);
+    });
+    svg.appendChild(linksG);
 
-    # Стартуем с текущего пользователя
-    traverse(request.user, level=0)
+    // Слой узлов
+    const nodesG = svgEl('g', {});
+    allNodes.forEach(n => {
+        const status = statusMap[n.id] || {};
+        const lo = n.personal_volume || 0;
+        const go = n.group_volume || status.go || 0;
+        const qual = n.partner_level || status.qualification || '';
+        const style = loStyle(lo);
 
-    return JsonResponse({'nodes': nodes, 'edges': edges})
+        const cx = n._x, cy = n._y;
+        const bx = cx - CARD_W / 2, by = cy - CARD_H / 2;
 
+        const g = svgEl('g', { style: 'cursor:pointer;' });
 
+        // Фон карточки
+        const rect = svgEl('rect', {
+            x: bx, y: by,
+            width: CARD_W, height: CARD_H,
+            rx: 8, ry: 8,
+            fill: style.fill,
+            stroke: style.stroke,
+            'stroke-width': '1.5'
+        });
 
-def get_referral_details(request, user_id):
-    """Получение детальной информации о реферале"""
-    try:
-        # Проверяем, что пользователь существует
-        db_user = CustomUser.objects.get(user_id=user_id)
-        
-        # # Проверяем, что это реферал текущего пользователя
-        # if db_user.referrer != request.user:
-        #     return JsonResponse({'error': True, 'message': 'Доступ запрещен'}, status=403)
-        
-        # Получаем данные из API
-        try:
-            response = requests.get(
-                f"{FASTAPI_SERVICE_URL}/user/users/{user_id}/status",
-                timeout=5
-            )
-            if response.status_code == 200:
-                api_data = response.json()
-                lo_amount = api_data.get('lo', 0)
-            else:
-                lo_amount = 0
-        except:
-            lo_amount = 0
-        
-        data = {
-            'id': db_user.user_id,
-            'name': db_user.get_full_name() or db_user.username,
-            'email': db_user.email,
-            'phone': db_user.phone,
-            'country': db_user.country,
-            'registration_date': db_user.date_joined.strftime('%d.%m.%Y'),
-            'personal_volume': float(lo_amount),  # Из API
-            'group_volume': float(db_user.group_volume),
-            'partner_level': db_user.partner_level,
-            'user_type': db_user.user_type,
-            'total_referrals': db_user.total_referrals,
-            'active_referrals': db_user.active_referrals,
-            'earnings': float(db_user.earnings),
-            'available_for_withdrawal': float(db_user.available_for_withdrawal),
-            'middle_name': db_user.middle_name or '',
-            'passport_number': db_user.passport_number or '',
-            'is_email_verified': db_user.is_email_verified,
-            'is_terms_accepted': db_user.is_terms_accepted,
-            'referral_code': db_user.referral_code,
-            'error': False
+        // Верхняя акцентная полоска
+        const accentBar = svgEl('rect', {
+            x: bx + 1, y: by + 1,
+            width: CARD_W - 2, height: 3,
+            rx: 7,
+            fill: style.stroke
+        });
+
+        // ID
+        const tId = svgEl('text', {
+            x: cx, y: cy - 20,
+            'text-anchor': 'middle',
+            fill: '#e2e8f0',
+            'font-size': '11',
+            'font-weight': '700',
+            'font-family': 'JetBrains Mono, monospace'
+        });
+        tId.textContent = `#${n.id}`;
+
+        // Квалификация
+        const tQual = svgEl('text', {
+            x: cx, y: cy - 5,
+            'text-anchor': 'middle',
+            fill: '#94a3b8',
+            'font-size': '9',
+            'font-weight': '600',
+            'font-family': 'system-ui, sans-serif',
+            'letter-spacing': '0.04em'
+        });
+        tQual.textContent = qual.toUpperCase();
+
+        // LO label
+        const tLoL = svgEl('text', { x: cx - 22, y: cy + 14, 'text-anchor': 'middle', fill: '#64748b', 'font-size': '8', 'font-family': 'system-ui' });
+        tLoL.textContent = 'LO';
+        // LO value
+        const tLoV = svgEl('text', { x: cx - 22, y: cy + 25, 'text-anchor': 'middle', fill: style.textColor, 'font-size': '10', 'font-weight': '700', 'font-family': 'JetBrains Mono, monospace' });
+        tLoV.textContent = lo;
+
+        // Разделитель
+        const divLine = svgEl('line', { x1: cx, y1: cy + 8, x2: cx, y2: cy + 28, stroke: '#2a2d38', 'stroke-width': '1' });
+
+        // GO label
+        const tGoL = svgEl('text', { x: cx + 22, y: cy + 14, 'text-anchor': 'middle', fill: '#64748b', 'font-size': '8', 'font-family': 'system-ui' });
+        tGoL.textContent = 'GO';
+        // GO value
+        const tGoV = svgEl('text', { x: cx + 22, y: cy + 25, 'text-anchor': 'middle', fill: '#a78bfa', 'font-size': '10', 'font-weight': '700', 'font-family': 'JetBrains Mono, monospace' });
+        tGoV.textContent = go;
+
+        g.append(rect, accentBar, tId, tQual, tLoL, tLoV, divLine, tGoL, tGoV);
+
+        // Ховер — подсветка
+        g.addEventListener('mouseenter', function(e) {
+            rect.setAttribute('filter', 'brightness(1.3)');
+            showGraphTooltip(e, n, status);
+        });
+        g.addEventListener('mousemove', moveGraphTooltip);
+        g.addEventListener('mouseleave', function() {
+            rect.removeAttribute('filter');
+            hideGraphTooltip();
+        });
+
+        // Клик → детали (только не для рута)
+        if (n.level > 0) {
+            g.addEventListener('click', () => showReferralDetails(n.id));
         }
-        
-        return JsonResponse(data)
-        
-    except CustomUser.DoesNotExist:
-        return JsonResponse({'error': True, 'message': 'Пользователь не найден'}, status=404)
-    except Exception as e:
-        logger.error(f"Ошибка при получении деталей реферала: {e}")
-        return JsonResponse({'error': True, 'message': str(e)}, status=500)
+
+        nodesG.appendChild(g);
+    });
+    svg.appendChild(nodesG);
+
+    loader.style.display = 'none';
+    svg.style.display    = 'block';
+
+    /* ── Зум ── */
+    let scale = 1;
+    const container = document.getElementById('graphContainer');
+
+    document.getElementById('btnZoomIn').onclick = () => {
+        scale = Math.min(scale * 1.25, 4);
+        svg.style.transform = `scale(${scale})`;
+        svg.style.transformOrigin = 'top left';
+    };
+    document.getElementById('btnZoomOut').onclick = () => {
+        scale = Math.max(scale * 0.8, 0.25);
+        svg.style.transform = `scale(${scale})`;
+        svg.style.transformOrigin = 'top left';
+    };
+    document.getElementById('btnFit').onclick = () => {
+        scale = 1;
+        svg.style.transform = '';
+        container.scrollTo(0, 0);
+    };
+}
+
+/* ── Тултип ── */
+const graphTooltip = document.getElementById('graphTooltip');
+
+function showGraphTooltip(e, n, status) {
+    const fmt = v => (v === undefined || v === null || v === '') ? '—' : v;
+    graphTooltip.innerHTML = `
+        <div class="tt-title">Пользователь #${n.id}</div>
+        <div class="tt-row"><span class="tt-label">Имя</span><span class="tt-val">${fmt(n.title || n.label)}</span></div>
+        <div class="tt-row"><span class="tt-label">LO (личный объём)</span><span class="tt-val">${fmt(n.personal_volume)}</span></div>
+        <div class="tt-row"><span class="tt-label">GO (групповой объём)</span><span class="tt-val">${fmt(n.group_volume)}</span></div>
+        <div class="tt-row"><span class="tt-label">Рефералов</span><span class="tt-val">${fmt(n.total_referrals)}</span></div>
+        <div class="tt-row"><span class="tt-label">Статус</span><span class="tt-val">${n.active ? '✅ Активный' : '⚪ Неактивный'}</span></div>
+        ${status.personal_bonus != null ? `<div class="tt-row"><span class="tt-label">Личный бонус</span><span class="tt-val">${status.personal_bonus}</span></div>` : ''}
+        ${status.structure_bonus != null ? `<div class="tt-row"><span class="tt-label">Структурный бонус</span><span class="tt-val">${status.structure_bonus}</span></div>` : ''}
+        ${status.total_income != null ? `<div class="tt-row"><span class="tt-label">Итого доход</span><span class="tt-val">${Number(status.total_income).toLocaleString('ru')}</span></div>` : ''}
+        ${n.partner_level ? `<div class="tt-qual">${n.partner_level}</div>` : ''}
+    `;
+    graphTooltip.style.display = 'block';
+    moveGraphTooltip(e);
+}
+
+function moveGraphTooltip(e) {
+    const pad = 14;
+    let x = e.clientX + pad;
+    let y = e.clientY + pad;
+    const tw = graphTooltip.offsetWidth;
+    const th = graphTooltip.offsetHeight;
+    if (x + tw > window.innerWidth  - 8) x = e.clientX - tw - pad;
+    if (y + th > window.innerHeight - 8) y = e.clientY - th - pad;
+    graphTooltip.style.left = x + 'px';
+    graphTooltip.style.top  = y + 'px';
+}
+
+function hideGraphTooltip() {
+    graphTooltip.style.display = 'none';
+}
 
 
+/* ============================================================
+   СПИСОК РЕФЕРАЛОВ
+   ============================================================ */
+function loadReferralsByLevel(level) {
+    const tbody = document.querySelector('tbody');
+    const oldContent = tbody.innerHTML;
 
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="8" class="text-center py-5">
+                <div class="spinner-border text-accent" role="status"></div>
+                <p class="mt-3 text-muted">Загрузка данных уровня ${level}...</p>
+            </td>
+        </tr>`;
 
+    fetch(`/cabinet/api/referrals/?level=${level}`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) throw new Error(data.message);
+            if (!data.referrals.length) {
+                tbody.innerHTML = `<tr><td colspan="8" class="text-center py-5">
+                    <div class="empty-state">
+                        <i class="fas fa-users-slash fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">На этом уровне рефералов нет</h5>
+                    </div></td></tr>`;
+                return;
+            }
+            updateTable(data.referrals, level);
+        })
+        .catch(err => {
+            tbody.innerHTML = oldContent;
+            showAlert('danger', `Ошибка: ${err.message}`);
+        });
+}
 
+function updateTable(referrals, level) {
+    const tbody = document.querySelector('tbody');
+    tbody.innerHTML = referrals.map(r => `
+        <tr class="${level > 1 ? `level-${r.level || level}` : ''}">
+            <td class="ps-4 fw-bold">${r.id}</td>
+            <td>
+                <div class="d-flex align-items-center">
+                    <div class="avatar-sm me-3">
+                        <div class="avatar-title bg-light text-accent rounded-circle">
+                            ${(r.name || 'U').charAt(0)}
+                        </div>
+                    </div>
+                    <div>
+                        <div class="fw-medium">${r.name || `Пользователь ${r.id}`}</div>
+                        <small class="text-muted">${r.level ? `Уровень ${r.level}` : 'Прямой реферал'}</small>
+                    </div>
+                </div>
+            </td>
+            <td>
+                ${r.email ? `<div class="small"><i class="fas fa-envelope fa-xs me-1 text-muted"></i>${r.email}</div>` : ''}
+                ${r.phone ? `<div class="small"><i class="fas fa-phone fa-xs me-1 text-muted"></i>${r.phone}</div>` : ''}
+            </td>
+            <td>${r.registration_date ? `<div class="small">${r.registration_date}</div>` : '<div class="text-muted">-</div>'}</td>
+            <td>
+                <div class="fw-medium">${r.personal_volume || 0} бал</div>
+                <div class="text-muted extra-small">Группа: ${r.group_volume || 0} бал</div>
+            </td>
+            <td>
+                <span class="badge ${r.partner_level === 'Начинающий' ? 'bg-secondary' : 'bg-accent'}">
+                    ${r.partner_level || '-'}
+                </span>
+            </td>
+            <td>
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-users fa-xs text-muted me-2"></i>
+                    <span class="fw-medium">${r.team_count || r.total_referrals || 0}</span>
+                </div>
+            </td>
+            <td class="pe-4">
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-secondary" onclick="showReferralDetails('${r.id}')">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    ${r.email ? `<button class="btn btn-outline-secondary" onclick="window.location.href='mailto:${r.email}'">
+                        <i class="fas fa-envelope"></i>
+                    </button>` : ''}
+                </div>
+            </td>
+        </tr>`).join('');
 
-######################################################################################
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
+}
 
-from django.shortcuts import render, redirect
-from django.contrib.auth.decorators import login_required
-from django.contrib import messages
-from django.contrib.auth import update_session_auth_hash
+function filterTable(searchTerm) {
+    let visible = 0;
+    document.querySelectorAll('tbody tr').forEach(row => {
+        if (row.querySelector('.empty-state')) return;
+        const show = row.textContent.toLowerCase().includes(searchTerm);
+        row.style.display = show ? '' : 'none';
+        if (show) visible++;
+    });
+    if (!visible && searchTerm) {
+        const row = document.createElement('tr');
+        row.id = 'noResultsRow';
+        row.innerHTML = `<td colspan="8" class="text-center py-5">
+            <i class="fas fa-search fa-3x text-muted mb-3"></i>
+            <h5 class="text-muted">Ничего не найдено</h5></td>`;
+        document.querySelector('tbody').appendChild(row);
+    } else {
+        document.getElementById('noResultsRow')?.remove();
+    }
+}
 
-from .forms import ProfileUpdateForm, CustomSetPasswordForm
+function showReferralDetails(userId) {
+    const modal = new bootstrap.Modal(document.getElementById('referralModal'));
+    modal.show();
 
+    fetch(`/cabinet/api/referrals/${userId}/details/`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) throw new Error(data.message);
+            document.getElementById('referralDetails').innerHTML = createReferralDetailsHTML(data);
+        })
+        .catch(err => {
+            document.getElementById('referralDetails').innerHTML = `
+                <div class="alert alert-danger">
+                    <strong>Ошибка!</strong> Не удалось загрузить данные.<br>${err.message}
+                </div>`;
+        });
+}
 
-@login_required
-def settings_view(request):
-    user = request.user
+function createReferralDetailsHTML(data) {
+    return `
+        <div class="user-details">
+            <div class="text-center mb-4">
+                <div class="avatar-lg mx-auto mb-3">
+                    <div class="avatar-title bg-light text-accent rounded-circle"
+                         style="width:80px;height:80px;font-size:2rem;">
+                        ${(data.name || 'U').charAt(0)}
+                    </div>
+                </div>
+                <h4>${data.name || `Пользователь ${data.id}`}</h4>
+                <span class="badge ${data.user_type === 'store' ? 'bg-warning' : 'bg-accent'}">
+                    ${data.user_type === 'store' ? 'Магазин' : 'Партнер'}
+                </span>
+            </div>
+            <div class="row">
+                <div class="col-md-6">
+                    ${detailRow('ID', data.id)}
+                    ${detailRow('Email', data.email)}
+                    ${detailRow('Телефон', data.phone)}
+                    ${detailRow('Страна', data.country)}
+                </div>
+                <div class="col-md-6">
+                    ${detailRow('Дата регистрации', data.registration_date)}
+                    ${detailRow('Личный объем', data.personal_volume != null ? data.personal_volume + ' бал' : null)}
+                    ${detailRow('Групповой объем', data.group_volume != null ? data.group_volume + ' бал' : null)}
+                    ${detailRow('Уровень', data.partner_level
+                        ? `<span class="badge ${data.partner_level === 'Начинающий' ? 'bg-secondary' : 'bg-accent'}">${data.partner_level}</span>`
+                        : null)}
+                </div>
+            </div>
+            <div class="mt-4 pt-3 border-top text-center">
+                <div class="row">
+                    <div class="col"><div class="h4 mb-1">${data.total_referrals || 0}</div><div class="text-muted small">Рефералов</div></div>
+                    <div class="col"><div class="h4 mb-1">${data.active_referrals || 0}</div><div class="text-muted small">Активных</div></div>
+                    <div class="col"><div class="h4 mb-1">${data.earnings || 0}</div><div class="text-muted small">Начисления</div></div>
+                </div>
+            </div>
+            ${data.available_for_withdrawal ? `
+            <div class="alert alert-success mt-3 d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-wallet me-2"></i><strong>Доступно для вывода:</strong></span>
+                <span class="h5 mb-0">${data.available_for_withdrawal} сум</span>
+            </div>` : ''}
+        </div>`;
+}
 
-    if request.method == 'POST':
-        profile_form = ProfileUpdateForm(request.POST, instance=user)
-        password_form = CustomSetPasswordForm(user, request.POST)
+function detailRow(label, value) {
+    return `
+        <div class="detail-row">
+            <div class="detail-label">${label}:</div>
+            <div class="detail-value">${value || '<span class="text-muted">Не указано</span>'}</div>
+        </div>`;
+}
 
-        if 'update_profile' in request.POST:
-            if profile_form.is_valid():
-                profile_form.save()
-                messages.success(request, 'Профиль обновлен')
-                return redirect('cabinet:settings')
+function showAlert(type, message) {
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} alert-dismissible fade show mt-3`;
+    alert.innerHTML = `<i class="fas fa-${type === 'danger' ? 'exclamation-circle' : 'check-circle'} me-2"></i>
+        ${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+    const container = document.querySelector('.col-lg-9');
+    container.insertBefore(alert, container.firstChild);
+    setTimeout(() => alert.parentNode && alert.remove(), 5000);
+}
 
-        elif 'change_password' in request.POST:
-            if password_form.is_valid():
-                user = password_form.save()
-                update_session_auth_hash(request, user)
-                messages.success(request, 'Пароль успешно изменён')
-                return redirect('cabinet:settings')
-
-    else:
-        profile_form = ProfileUpdateForm(instance=user)
-        password_form = CustomSetPasswordForm(user)
-
-    return render(request, 'cabinet/settings.html', {
-        'profile_form': profile_form,
-        'password_form': password_form,
-    })
+function shareReferralLink() {
+    const referralLink = document.getElementById('referralLink')?.value ||
+                         '{{ request.scheme }}://{{ request.get_host }}/register/{{ user.referral_link }}/';
+    if (navigator.share) {
+        navigator.share({ title: 'Присоединяйтесь к EVERON!', url: referralLink });
+    } else {
+        navigator.clipboard.writeText(referralLink)
+            .then(() => showAlert('success', 'Ссылка скопирована!'))
+            .catch(() => showAlert('danger', 'Не удалось скопировать ссылку'));
+    }
+}
+</script>
+{% endblock %}
