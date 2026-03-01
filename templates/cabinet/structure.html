@@ -281,20 +281,18 @@
                             </button>
                         </div>
 
-                        <!-- Легенда -->
-                        <div class="d-flex align-items-center gap-3 small">
-                            <span style="color:#64748b;">
-                                <span class="tree-legend-dot" style="background:#3a4060;"></span> LO &lt; 100
-                            </span>
-                            <span style="color:#64748b;">
-                                <span class="tree-legend-dot" style="background:#2563eb;"></span> LO 100–499
-                            </span>
-                            <span style="color:#64748b;">
-                                <span class="tree-legend-dot" style="background:#16a34a;"></span> LO 500–999
-                            </span>
-                            <span style="color:#64748b;">
-                                <span class="tree-legend-dot" style="background:#d97706;"></span> LO 1000+
-                            </span>
+                        <!-- Легенда по квалификациям -->
+                        <div class="d-flex align-items-center gap-3 small" style="flex-wrap:wrap;">
+                            <span style="color:#94a3b8;"><span class="tree-legend-dot" style="background:#3a4060;"></span> Hamkor</span>
+                            <span style="color:#38bdf8;"><span class="tree-legend-dot" style="background:#0ea5e9;"></span> Mentor</span>
+                            <span style="color:#22d3ee;"><span class="tree-legend-dot" style="background:#06b6d4;"></span> Menejer</span>
+                            <span style="color:#60a5fa;"><span class="tree-legend-dot" style="background:#2563eb;"></span> Direktor</span>
+                            <span style="color:#f59e0b;"><span class="tree-legend-dot" style="background:#b45309;"></span> Bronza</span>
+                            <span style="color:#e2e8f0;"><span class="tree-legend-dot" style="background:#94a3b8;"></span> Kumush</span>
+                            <span style="color:#fbbf24;"><span class="tree-legend-dot" style="background:#d97706;"></span> Oltin</span>
+                            <span style="color:#34d399;"><span class="tree-legend-dot" style="background:#059669;"></span> Zumrad</span>
+                            <span style="color:#c4b5fd;"><span class="tree-legend-dot" style="background:#7c3aed;"></span> Brilliant</span>
+                            <span style="color:#f472b6;"><span class="tree-legend-dot" style="background:#db2777;"></span> Olmos</span>
                         </div>
                     </div>
 
@@ -500,7 +498,7 @@ document.addEventListener('DOMContentLoaded', function () {
    ============================================================ */
 
 const CARD_W = 110;
-const CARD_H = 68;
+const CARD_H = 82;
 const GAP_Y  = 110;
 
 let graphLoaded = false;
@@ -512,12 +510,22 @@ function svgEl(tag, attrs) {
     return el;
 }
 
-/* ── Цветовая схема по LO ── */
-function loStyle(lo) {
-    if (lo >= 1000) return { fill: '#2a1e06', stroke: '#d97706', textColor: '#fbbf24' };
-    if (lo >= 500)  return { fill: '#0b1f12', stroke: '#16a34a', textColor: '#4ade80' };
-    if (lo >= 100)  return { fill: '#0c1829', stroke: '#2563eb', textColor: '#60a5fa' };
-    return              { fill: '#14182a', stroke: '#3a4060', textColor: '#94a3b8' };
+/* ── Цветовая схема по квалификации ── */
+const QUAL_STYLES = {
+    'Hamkor':    { fill: '#141820', stroke: '#3a4060', textColor: '#94a3b8'  },
+    'Mentor':    { fill: '#0d1a2d', stroke: '#0ea5e9', textColor: '#38bdf8'  },
+    'Menejer':   { fill: '#0a1e22', stroke: '#06b6d4', textColor: '#22d3ee'  },
+    'Direktor':  { fill: '#0c1829', stroke: '#2563eb', textColor: '#60a5fa'  },
+    'Bronza':    { fill: '#1e1508', stroke: '#b45309', textColor: '#f59e0b'  },
+    'Kumush':    { fill: '#1a1e24', stroke: '#94a3b8', textColor: '#e2e8f0'  },
+    'Oltin':     { fill: '#221a06', stroke: '#d97706', textColor: '#fbbf24'  },
+    'Zumrad':    { fill: '#0b1f12', stroke: '#059669', textColor: '#34d399'  },
+    'Brilliant': { fill: '#1a0a2e', stroke: '#7c3aed', textColor: '#c4b5fd'  },
+    'Olmos':     { fill: '#200818', stroke: '#db2777', textColor: '#f472b6'  },
+};
+
+function qualStyle(qualification) {
+    return QUAL_STYLES[qualification] || { fill: '#141820', stroke: '#3a4060', textColor: '#94a3b8' };
 }
 
 /* ── Строим дерево из nodes + edges (оба id приводим к строке) ── */
@@ -578,50 +586,72 @@ function drawLinks(node, container) {
 function drawNodes(node, container) {
     const lo   = node.personal_volume || 0;
     const go   = node.group_volume    || 0;
-    const qual = node.partner_level   || '';
-    const st   = loStyle(lo);
+    const qual = node.qualification || node.partner_level || '';
+    const name = (node.label || '').trim();
+    const st   = qualStyle(qual);
     const cx   = node._x, cy = node._y;
-    const bx   = cx - CARD_W / 2, by = cy - CARD_H / 2;
+
+    // Высота карточки: 82px чтобы влезло имя
+    const W = CARD_W, H = CARD_H;
+    const bx = cx - W / 2, by = cy - H / 2;
 
     const g = svgEl('g', { style: 'cursor:pointer;' });
 
     const rect = svgEl('rect', {
-        x: bx, y: by, width: CARD_W, height: CARD_H,
+        x: bx, y: by, width: W, height: H,
         rx: 8, ry: 8, fill: st.fill, stroke: st.stroke, 'stroke-width': '1.5'
     });
     const accentBar = svgEl('rect', {
-        x: bx + 1, y: by + 1, width: CARD_W - 2, height: 3,
+        x: bx + 1, y: by + 1, width: W - 2, height: 3,
         rx: 7, fill: st.stroke
     });
 
     // #ID
-    const tId = svgEl('text', { x: cx, y: cy - 20, 'text-anchor': 'middle',
-        fill: '#e2e8f0', 'font-size': '11', 'font-weight': '700',
+    const tId = svgEl('text', { x: cx, y: cy - 28, 'text-anchor': 'middle',
+        fill: '#e2e8f0', 'font-size': '10', 'font-weight': '700',
         'font-family': 'JetBrains Mono, monospace' });
     tId.textContent = `#${node.id}`;
 
+    // Имя (обрезаем если длинное)
+    const shortName = name.length > 14 ? name.slice(0, 13) + '…' : name;
+    const tName = svgEl('text', { x: cx, y: cy - 14, 'text-anchor': 'middle',
+        fill: st.textColor, 'font-size': '9', 'font-weight': '600',
+        'font-family': 'system-ui, sans-serif' });
+    tName.textContent = shortName;
+
     // Квалификация
-    const tQual = svgEl('text', { x: cx, y: cy - 5, 'text-anchor': 'middle',
-        fill: '#94a3b8', 'font-size': '9', 'font-weight': '600',
-        'font-family': 'system-ui, sans-serif', 'letter-spacing': '0.04em' });
+    const tQual = svgEl('text', { x: cx, y: cy + 1, 'text-anchor': 'middle',
+        fill: st.stroke, 'font-size': '8', 'font-weight': '700',
+        'font-family': 'system-ui, sans-serif', 'letter-spacing': '0.06em' });
     tQual.textContent = qual.toUpperCase();
 
+    // Разделитель горизонтальный
+    const divH = svgEl('line', { x1: bx + 8, y1: cy + 9, x2: bx + W - 8, y2: cy + 9,
+        stroke: '#2a2d38', 'stroke-width': '1' });
+
     // LO
-    const tLoL = svgEl('text', { x: cx - 22, y: cy + 14, 'text-anchor': 'middle', fill: '#64748b', 'font-size': '8', 'font-family': 'system-ui' });
+    const tLoL = svgEl('text', { x: cx - 22, y: cy + 22, 'text-anchor': 'middle',
+        fill: '#64748b', 'font-size': '8', 'font-family': 'system-ui' });
     tLoL.textContent = 'LO';
-    const tLoV = svgEl('text', { x: cx - 22, y: cy + 25, 'text-anchor': 'middle', fill: st.textColor, 'font-size': '10', 'font-weight': '700', 'font-family': 'JetBrains Mono, monospace' });
+    const tLoV = svgEl('text', { x: cx - 22, y: cy + 33, 'text-anchor': 'middle',
+        fill: st.textColor, 'font-size': '10', 'font-weight': '700',
+        'font-family': 'JetBrains Mono, monospace' });
     tLoV.textContent = lo;
 
-    // Разделитель
-    const divLine = svgEl('line', { x1: cx, y1: cy + 8, x2: cx, y2: cy + 28, stroke: '#2a2d38', 'stroke-width': '1' });
+    // Разделитель вертикальный
+    const divV = svgEl('line', { x1: cx, y1: cy + 14, x2: cx, y2: cy + 36,
+        stroke: '#2a2d38', 'stroke-width': '1' });
 
     // GO
-    const tGoL = svgEl('text', { x: cx + 22, y: cy + 14, 'text-anchor': 'middle', fill: '#64748b', 'font-size': '8', 'font-family': 'system-ui' });
+    const tGoL = svgEl('text', { x: cx + 22, y: cy + 22, 'text-anchor': 'middle',
+        fill: '#64748b', 'font-size': '8', 'font-family': 'system-ui' });
     tGoL.textContent = 'GO';
-    const tGoV = svgEl('text', { x: cx + 22, y: cy + 25, 'text-anchor': 'middle', fill: '#a78bfa', 'font-size': '10', 'font-weight': '700', 'font-family': 'JetBrains Mono, monospace' });
+    const tGoV = svgEl('text', { x: cx + 22, y: cy + 33, 'text-anchor': 'middle',
+        fill: '#a78bfa', 'font-size': '10', 'font-weight': '700',
+        'font-family': 'JetBrains Mono, monospace' });
     tGoV.textContent = go;
 
-    g.append(rect, accentBar, tId, tQual, tLoL, tLoV, divLine, tGoL, tGoV);
+    g.append(rect, accentBar, tId, tName, tQual, divH, tLoL, tLoV, divV, tGoL, tGoV);
 
     g.addEventListener('mouseenter', e => { rect.style.opacity = '0.85'; showGraphTooltip(e, node); });
     g.addEventListener('mousemove',  moveGraphTooltip);
