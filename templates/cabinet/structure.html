@@ -616,9 +616,18 @@ function renderDarkTree(root, allNodes, edges, statusMap) {
     const totalW = Math.max(1000, (leaves + 1) * gapX);
     const totalH = Math.max(500,  (maxLvl + 2) * (CARD_H + GAP_Y));
 
-    // Layout
+    // Layout — считаем координаты на дереве
     const state = { cursor: 0, gapX: totalW / (leaves + 1), startY: 50 };
     layoutTree(root, state);
+
+    // Копируем _x/_y из дерева обратно в плоский массив allNodes
+    // (layoutTree работает с объектами дерева, allNodes — оригинальный массив из API)
+    function copyCoords(treeNode) {
+        const flat = allNodes.find(n => n.id === treeNode.id);
+        if (flat) { flat._x = treeNode._x; flat._y = treeNode._y; }
+        (treeNode.team || []).forEach(copyCoords);
+    }
+    copyCoords(root);
 
     // Настраиваем SVG
     svg.setAttribute('width', totalW);
