@@ -447,51 +447,16 @@ def get_referrals_json(request):
 def referral_tree_api(request):
     """
     Возвращает дерево рефералов.
-    lo/go берём из FastAPI (актуальные данные),
-    имя/контакты — из Django БД.
+    Для каждого узла параллельно запрашивает /status из FastAPI
+    чтобы получить актуальные lo, go, qualification и бонусы.
     """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
     nodes = []
     edges = []
     visited = set()
 
-    # ── 1. Получаем структуру с lo из FastAPI ──────────────────────
-    lo_map = {}   # user_id (str) → {'lo': ..., 'go': ...}
-
-    try:
-        resp = requests.get(
-            f"{FASTAPI_SERVICE_URL}/user/users/{request.user.username}/structure",
-            timeout=5
-        )
-        if resp.status_code == 200:
-            api_data = resp.json()
-            if not api_data.get('error'):
-                # Рекурсивно собираем lo из дерева FastAPI
-                def collect_lo(node):
-                    uid = str(node.get('user_id', ''))
-                    lo_map[uid] = node.get('lo', 0)
-                    for child in node.get('team', []):
-                        collect_lo(child)
-
-                collect_lo(api_data.get('data', {}))
-    except requests.RequestException as e:
-        logger.warning(f"FastAPI structure недоступен: {e}")
-
-    # ── 2. Если есть статус текущего юзера — берём его go ──────────
-    # (опционально, можно убрать если не нужно)
-    root_go = 0
-    try:
-        resp2 = requests.get(
-            f"{FASTAPI_SERVICE_URL}/user/users/{request.user.username}/status",
-            timeout=3
-        )
-        if resp2.status_code == 200:
-            st = resp2.json()
-            if not st.get('error'):
-                root_go = st.get('data', {}).get('go', 0)
-    except Exception:
-        pass
-
-    # ── 3. Обходим дерево Django БД ────────────────────────────────
+    # ── 1. Обходим дерево Django БД, собираем базовые данные ───────
     def get_short_name(user):
         parts = [user.first_name, user.last_name]
         name = ' '.join(p for p in parts if p).strip()
@@ -507,29 +472,33 @@ def referral_tree_api(request):
             return
         visited.add(user.pk)
 
-        uid_str = str(user.user_id)
-
-        # lo — из FastAPI если есть, иначе из БД
-        lo = lo_map.get(uid_str, None)
-        if lo is None:
-            lo = float(getattr(user, 'personal_volume', 0) or 0)
-        else:
-            lo = float(lo)
-
-        # go — из БД (FastAPI structure не возвращает go по каждому узлу)
-        go = float(getattr(user, 'group_volume', 0) or 0)
-
         nodes.append({
-            'id':              user.user_id,
-            'label':           get_short_name(user),
-            'title':           get_full_name(user),
-            'level':           level,
-            'active':          getattr(user, 'is_active', True),
-            'personal_volume': lo,
-            'group_volume':    go,
+            'id':            user.user_id,
+            'label':         get_short_name(user),
+            'title':         get_full_name(user),
+            'level':         level,
+            'active':        getattr(user, 'is_active', True),
+            'user_type':     getattr(user, 'user_type', 'partner'),
+            # Временные значения — перезапишем из FastAPI ниже
+            'personal_volume': 0.0,
+            'group_volume':    0.0,
             'partner_level':   getattr(user, 'partner_level', ''),
             'total_referrals': getattr(user, 'total_referrals', 0),
-            'user_type':       getattr(user, 'user_type', 'partner'),
+            # Дополнительные поля из /status
+            'qualification':     '',
+            'side_volume':       0,
+            'points':            0,
+            'personal_bonus':    0,
+            'structure_bonus':   0,
+            'mentor_bonus':      0,
+            'extra_bonus':       '',
+            'personal_money':    0,
+            'group_money':       0,
+            'leader_money':      0,
+            'side_vol_money':    0,
+            'total_money':       0,
+            'veron':             0,
+            'total_income':      0,
         })
 
         referrals = CustomUser.objects.filter(referrer=user)
@@ -538,6 +507,53 @@ def referral_tree_api(request):
             traverse(referral, level + 1)
 
     traverse(request.user, level=0)
+
+    # ── 2. Параллельно запрашиваем /status для каждого узла ────────
+    def fetch_status(user_id):
+        try:
+            resp = requests.get(
+                f"{FASTAPI_SERVICE_URL}/user/users/{user_id}/status",
+                timeout=5
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                if not data.get('error'):
+                    return user_id, data.get('data', {})
+        except Exception as e:
+            logger.warning(f"Не удалось получить статус для {user_id}: {e}")
+        return user_id, {}
+
+    # Запускаем параллельно (макс 10 потоков)
+    user_ids = [n['id'] for n in nodes]
+    status_map = {}
+
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = {executor.submit(fetch_status, uid): uid for uid in user_ids}
+        for future in as_completed(futures):
+            uid, status = future.result()
+            status_map[uid] = status
+
+    # ── 3. Обогащаем узлы данными из FastAPI ───────────────────────
+    for node in nodes:
+        st = status_map.get(node['id'], {})
+        if st:
+            node['personal_volume'] = float(st.get('lo', 0) or 0)
+            node['group_volume']    = float(st.get('go', 0) or 0)
+            node['qualification']   = st.get('qualification', '')
+            node['partner_level']   = st.get('qualification', node['partner_level'])
+            node['side_volume']     = st.get('side_volume', 0)
+            node['points']          = st.get('points', 0)
+            node['personal_bonus']  = st.get('personal_bonus', 0)
+            node['structure_bonus'] = st.get('structure_bonus', 0)
+            node['mentor_bonus']    = st.get('mentor_bonus', 0)
+            node['extra_bonus']     = st.get('extra_bonus', '')
+            node['personal_money']  = st.get('personal_money', 0)
+            node['group_money']     = st.get('group_money', 0)
+            node['leader_money']    = st.get('leader_money', 0)
+            node['side_vol_money']  = st.get('side_vol_money', 0)
+            node['total_money']     = st.get('total_money', 0)
+            node['veron']           = st.get('veron', 0)
+            node['total_income']    = st.get('total_income', 0)
 
     return JsonResponse({'nodes': nodes, 'edges': edges})
 

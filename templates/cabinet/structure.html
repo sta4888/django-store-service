@@ -718,15 +718,35 @@ function initGraph() {
 const graphTooltip = document.getElementById('graphTooltip');
 
 function showGraphTooltip(e, n) {
-    const fmt = v => (v === undefined || v === null || v === '') ? '—' : v;
+    const fmt  = v => (v === undefined || v === null || v === '') ? '—' : v;
+    const money = v => (v == null || v === 0) ? null : Number(v).toLocaleString('ru') + ' сум';
+
+    const rows = [
+        ['Имя',                fmt(n.title || n.label)],
+        ['LO',                 fmt(n.personal_volume)],
+        ['GO',                 fmt(n.group_volume)],
+        ['Side Volume',        n.side_volume || null],
+        ['Баллы',              n.points      || null],
+        ['Рефералов',          fmt(n.total_referrals)],
+        ['Статус',             n.active ? '✅ Активный' : '⚪ Неактивный'],
+        ['Личный бонус',       n.personal_bonus  || null],
+        ['Структурный бонус',  n.structure_bonus || null],
+        ['Ментор бонус',       n.mentor_bonus    || null],
+        ['Экстра бонус',       n.extra_bonus     || null],
+        ['Личные деньги',      money(n.personal_money)],
+        ['Группа деньги',      money(n.group_money)],
+        ['Лидер деньги',       money(n.leader_money)],
+        ['Итого доход',        money(n.total_income)],
+        ['Верон',              n.veron           || null],
+    ].filter(([, v]) => v !== null && v !== undefined && v !== '');
+
     graphTooltip.innerHTML = `
-        <div class="tt-title">Пользователь #${n.id}</div>
-        <div class="tt-row"><span class="tt-label">Имя</span><span class="tt-val">${fmt(n.title || n.label)}</span></div>
-        <div class="tt-row"><span class="tt-label">LO (личный объём)</span><span class="tt-val">${fmt(n.personal_volume)}</span></div>
-        <div class="tt-row"><span class="tt-label">GO (групповой объём)</span><span class="tt-val">${fmt(n.group_volume)}</span></div>
-        <div class="tt-row"><span class="tt-label">Рефералов</span><span class="tt-val">${fmt(n.total_referrals)}</span></div>
-        <div class="tt-row"><span class="tt-label">Статус</span><span class="tt-val">${n.active ? '✅ Активный' : '⚪ Неактивный'}</span></div>
-        ${n.partner_level ? `<div class="tt-qual">${n.partner_level}</div>` : ''}
+        <div class="tt-title">#${n.id} ${n.qualification ? '· ' + n.qualification : ''}</div>
+        ${rows.map(([label, val]) => `
+            <div class="tt-row">
+                <span class="tt-label">${label}</span>
+                <span class="tt-val">${val}</span>
+            </div>`).join('')}
     `;
     graphTooltip.style.display = 'block';
     moveGraphTooltip(e);
