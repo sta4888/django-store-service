@@ -446,13 +446,52 @@ def get_referrals_json(request):
 @login_required
 def referral_tree_api(request):
     """
-    Возвращает дерево рефералов для текущего пользователя.
-    Без учёта глубины — загружает всю структуру целиком.
+    Возвращает дерево рефералов.
+    lo/go берём из FastAPI (актуальные данные),
+    имя/контакты — из Django БД.
     """
     nodes = []
     edges = []
-    visited = set()  # защита от циклов
+    visited = set()
 
+    # ── 1. Получаем структуру с lo из FastAPI ──────────────────────
+    lo_map = {}   # user_id (str) → {'lo': ..., 'go': ...}
+
+    try:
+        resp = requests.get(
+            f"{FASTAPI_SERVICE_URL}/user/users/{request.user.username}/structure",
+            timeout=5
+        )
+        if resp.status_code == 200:
+            api_data = resp.json()
+            if not api_data.get('error'):
+                # Рекурсивно собираем lo из дерева FastAPI
+                def collect_lo(node):
+                    uid = str(node.get('user_id', ''))
+                    lo_map[uid] = node.get('lo', 0)
+                    for child in node.get('team', []):
+                        collect_lo(child)
+
+                collect_lo(api_data.get('data', {}))
+    except requests.RequestException as e:
+        logger.warning(f"FastAPI structure недоступен: {e}")
+
+    # ── 2. Если есть статус текущего юзера — берём его go ──────────
+    # (опционально, можно убрать если не нужно)
+    root_go = 0
+    try:
+        resp2 = requests.get(
+            f"{FASTAPI_SERVICE_URL}/user/users/{request.user.username}/status",
+            timeout=3
+        )
+        if resp2.status_code == 200:
+            st = resp2.json()
+            if not st.get('error'):
+                root_go = st.get('data', {}).get('go', 0)
+    except Exception:
+        pass
+
+    # ── 3. Обходим дерево Django БД ────────────────────────────────
     def get_short_name(user):
         parts = [user.first_name, user.last_name]
         name = ' '.join(p for p in parts if p).strip()
@@ -468,27 +507,36 @@ def referral_tree_api(request):
             return
         visited.add(user.pk)
 
+        uid_str = str(user.user_id)
+
+        # lo — из FastAPI если есть, иначе из БД
+        lo = lo_map.get(uid_str, None)
+        if lo is None:
+            lo = float(getattr(user, 'personal_volume', 0) or 0)
+        else:
+            lo = float(lo)
+
+        # go — из БД (FastAPI structure не возвращает go по каждому узлу)
+        go = float(getattr(user, 'group_volume', 0) or 0)
+
         nodes.append({
             'id':              user.user_id,
             'label':           get_short_name(user),
-            'title':           get_full_name(user),   # для тултипа
+            'title':           get_full_name(user),
             'level':           level,
             'active':          getattr(user, 'is_active', True),
-            'personal_volume': float(getattr(user, 'personal_volume', 0) or 0),
-            'group_volume':    float(getattr(user, 'group_volume', 0) or 0),
+            'personal_volume': lo,
+            'group_volume':    go,
             'partner_level':   getattr(user, 'partner_level', ''),
             'total_referrals': getattr(user, 'total_referrals', 0),
             'user_type':       getattr(user, 'user_type', 'partner'),
         })
 
-        # Загружаем прямых рефералов одним запросом
         referrals = CustomUser.objects.filter(referrer=user)
-
         for referral in referrals:
             edges.append({'from': user.user_id, 'to': referral.user_id})
             traverse(referral, level + 1)
 
-    # Стартуем с текущего пользователя
     traverse(request.user, level=0)
 
     return JsonResponse({'nodes': nodes, 'edges': edges})
