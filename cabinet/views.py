@@ -494,7 +494,6 @@ def referral_tree_api(request):
 
 
 
-@login_required
 def get_referral_details(request, user_id):
     """Получение детальной информации о реферале"""
     try:
