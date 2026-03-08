@@ -1,5 +1,35 @@
-logs/
+# Python
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
+*.egg-info/
+dist/
+.eggs/
+
+# Виртуальное окружение
+.venv/
+venv/
+env/
+
+# IDE
 .idea/
+.vscode/
+*.swp
+
+# Django
+db.sqlite3
+staticfiles/
+mediafiles/
+*.log
+
+# Логи
+logs/
+
+# Окружение
+.env
+.env.*
+!.env.example
+
+# Nginx
+nginx-proxy-manager/
