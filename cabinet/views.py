@@ -724,12 +724,43 @@ def generate_monthly_report(request):
 
     logger.info(f"MonthlyReport: сохранено {saved}, ошибок {errors} ({month}/{year})")
 
+    # 4. Параллельно сбрасываем данные в FastAPI для каждого пользователя
+    def reset_user_data(user):
+        try:
+            resp = requests.post(
+                f"{FASTAPI_SERVICE_URL}/user/users/{user.username}/reset",
+                timeout=5
+            )
+            if resp.status_code == 200:
+                payload = resp.json()
+                if not payload.get('error'):
+                    return user.pk, True
+        except Exception as e:
+            logger.warning(f"Не удалось сбросить данные для {user.username}: {e}")
+        return user.pk, False
+
+    reset_ok = 0
+    reset_errors = 0
+
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        reset_futures = {executor.submit(reset_user_data, u): u for u in all_users}
+        for future in as_completed(reset_futures):
+            _pk, success = future.result()
+            if success:
+                reset_ok += 1
+            else:
+                reset_errors += 1
+
+    logger.info(f"FastAPI reset: успешно {reset_ok}, ошибок {reset_errors} ({month}/{year})")
+
     return JsonResponse({
         'success': True,
         'saved': saved,
         'errors': errors,
         'month': month,
         'year': year,
+        'reset_ok': reset_ok,
+        'reset_errors': reset_errors,
     })
 
 
