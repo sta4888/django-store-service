@@ -1016,7 +1016,14 @@ document.getElementById('btn-save-report').addEventListener('click', function ()
         if (data.success) {
             alert.className = 'alert alert-success';
             let msg = `<i class="fas fa-check-circle me-2"></i>Отчёт за ${data.month}/${data.year} сохранён: <strong>${data.saved}</strong> пользователей.`;
-            if (data.errors > 0) msg += ` Ошибок: <strong>${data.errors}</strong>.`;
+            if (data.errors > 0) msg += ` Ошибок при сохранении: <strong>${data.errors}</strong>.`;
+            if (data.reset_ok > 0) {
+                msg += ` Данные FastAPI сброшены: <strong>${data.reset_ok}</strong>`;
+                if (data.reset_errors > 0) msg += `, ошибок сброса: <strong>${data.reset_errors}</strong>`;
+                msg += '.';
+            } else if (data.reset_errors > 0) {
+                msg += ` <span class="text-warning">Не удалось сбросить данные FastAPI: <strong>${data.reset_errors}</strong> ошибок.</span>`;
+            }
             alert.innerHTML = msg;
         } else {
             alert.className = 'alert alert-danger';
