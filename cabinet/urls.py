@@ -22,6 +22,9 @@ urlpatterns = [
     path('api/referrals/<str:user_id>/details/', views.get_referral_details, name='referral_details'),
     path('api/monthly-report/generate/', views.generate_monthly_report, name='generate_monthly_report'),
 
+    path('reports/history/', views.monthly_reports_history, name='monthly_reports'),
+    path('reports/history/export/', views.export_monthly_reports_excel, name='export_monthly_reports'),
+
     path('admin/', views.admin_panel, name='admin_page'),
 
 ]
