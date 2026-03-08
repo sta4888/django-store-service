@@ -29,6 +29,10 @@
                class="{% if request.resolver_match.url_name == 'admin_page' %}active{% endif %}">
             <i class="fas fa-cog"></i> Администрирование</a>
         </li>
+        <li><a href="{% url 'cabinet:monthly_reports' %}"
+               class="{% if request.resolver_match.url_name == 'monthly_reports' %}active{% endif %}">
+            <i class="fas fa-chart-bar"></i> История отчётов</a>
+        </li>
         {% endif %}
 
         <li><a href="#"><i class="fas fa-link"></i> Реферальная ссылка</a></li>

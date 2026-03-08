@@ -784,6 +784,168 @@ def generate_monthly_report(request):
 
 ######################################################################################
 
+MONTHS_RU = {
+    1: 'Январь', 2: 'Февраль', 3: 'Март', 4: 'Апрель',
+    5: 'Май', 6: 'Июнь', 7: 'Июль', 8: 'Август',
+    9: 'Сентябрь', 10: 'Октябрь', 11: 'Ноябрь', 12: 'Декабрь',
+}
+
+
+@login_required
+def monthly_reports_history(request):
+    """История месячных отчётов — только для магазинов и администраторов"""
+    from django.core.exceptions import PermissionDenied
+
+    if not (request.user.is_store or request.user.is_staff):
+        raise PermissionDenied("У вас нет доступа к истории отчётов")
+
+    year_filter  = request.GET.get('year', '').strip()
+    month_filter = request.GET.get('month', '').strip()
+    search       = request.GET.get('search', '').strip()
+
+    reports = MonthlyReport.objects.select_related('user').order_by('-year', '-month', 'user__username')
+
+    if year_filter:
+        reports = reports.filter(year=year_filter)
+    if month_filter:
+        reports = reports.filter(month=month_filter)
+    if search:
+        reports = reports.filter(
+            user__username__icontains=search
+        ) | reports.filter(
+            user__first_name__icontains=search
+        ) | reports.filter(
+            user__last_name__icontains=search
+        )
+
+    available_years = (
+        MonthlyReport.objects.values_list('year', flat=True)
+        .distinct().order_by('-year')
+    )
+
+    paginator = Paginator(reports, 25)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'reports': page_obj,
+        'available_years': available_years,
+        'months': [(k, v) for k, v in MONTHS_RU.items()],
+        'year_filter': year_filter,
+        'month_filter': month_filter,
+        'search': search,
+        'total_count': reports.count(),
+    }
+    return render(request, 'cabinet/monthly_reports.html', context)
+
+
+@login_required
+def export_monthly_reports_excel(request):
+    """Экспорт месячных отчётов в Excel (.xlsx)"""
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from django.http import HttpResponse
+    from django.core.exceptions import PermissionDenied
+
+    if not (request.user.is_store or request.user.is_staff):
+        raise PermissionDenied("У вас нет доступа")
+
+    year_filter  = request.GET.get('year', '').strip()
+    month_filter = request.GET.get('month', '').strip()
+    search       = request.GET.get('search', '').strip()
+
+    reports = MonthlyReport.objects.select_related('user').order_by('-year', '-month', 'user__username')
+    if year_filter:
+        reports = reports.filter(year=year_filter)
+    if month_filter:
+        reports = reports.filter(month=month_filter)
+    if search:
+        reports = reports.filter(
+            user__username__icontains=search
+        ) | reports.filter(
+            user__first_name__icontains=search
+        ) | reports.filter(
+            user__last_name__icontains=search
+        )
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Месячные отчёты'
+
+    headers = [
+        'Пользователь', 'Год', 'Месяц', 'Уровень партнёра',
+        'LO (личный объём)', 'GO (групп. объём)', 'Боковой объём',
+        'Баллы', 'Вероны',
+        'Личный бонус', 'Структурный бонус', 'Менторский бонус',
+        'Доп. бонус', 'Суммарный бонус',
+        'Личный доход', 'Групповой доход', 'Лидерский доход',
+        'Доход с бок. объёма', 'Итого доход', 'Общий доход',
+        'Новые рефералы', 'Активные рефералы',
+        'Кол-во заказов', 'Сумма заказов',
+        'Дата создания',
+    ]
+
+    header_fill = PatternFill(start_color='1F4E79', end_color='1F4E79', fill_type='solid')
+    header_font = Font(color='FFFFFF', bold=True)
+
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    ws.row_dimensions[1].height = 30
+
+    for report in reports:
+        ws.append([
+            report.user.username,
+            report.year,
+            MONTHS_RU.get(report.month, report.month),
+            report.partner_level,
+            float(report.personal_volume),
+            float(report.group_volume),
+            float(report.side_volume),
+            float(report.points),
+            float(report.veron),
+            float(report.personal_bonus),
+            float(report.structure_bonus),
+            float(report.mentor_bonus),
+            report.extra_bonus,
+            float(report.bonus_total),
+            float(report.personal_money),
+            float(report.group_money),
+            float(report.leader_money),
+            float(report.side_vol_money),
+            float(report.total_money),
+            float(report.total_income),
+            report.new_referrals,
+            report.active_referrals_count,
+            report.purchases_count,
+            float(report.purchases_amount),
+            report.created_at.strftime('%d.%m.%Y %H:%M'),
+        ])
+
+    # Авто-ширина столбцов
+    for col in ws.columns:
+        max_len = max((len(str(cell.value or '')) for cell in col), default=10)
+        ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 32)
+
+    filename_parts = ['monthly_reports']
+    if year_filter:
+        filename_parts.append(year_filter)
+    if month_filter:
+        filename_parts.append(month_filter)
+    filename = '_'.join(filename_parts) + '.xlsx'
+
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    wb.save(response)
+    return response
+
+
+######################################################################################
+
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
