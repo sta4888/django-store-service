@@ -20,8 +20,14 @@
                 <div class="text-end">
                     <div class="text-muted small">ID партнера: {{ user.username }}</div>
                     <div class="text-muted small">Всего рефералов: {{ total_referrals }}</div>
+                    <button id="btn-save-report" class="btn btn-sm btn-outline-primary mt-2">
+                        <i class="fas fa-save me-1"></i> Сохранить месячный отчёт
+                    </button>
                 </div>
             </div>
+
+            <!-- Уведомление о результате -->
+            <div id="report-alert" class="alert d-none mb-3" role="alert"></div>
 
             <!-- Статистика карточки -->
             <div class="stats-grid mb-4">
@@ -988,6 +994,44 @@ function showAlert(type, message) {
     container.insertBefore(alert, container.firstChild);
     setTimeout(() => alert.parentNode && alert.remove(), 5000);
 }
+
+// Сохранение месячного отчёта
+document.getElementById('btn-save-report').addEventListener('click', function () {
+    const btn = this;
+    const alert = document.getElementById('report-alert');
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Сохранение...';
+    alert.className = 'alert d-none';
+
+    fetch("{% url 'cabinet:generate_monthly_report' %}", {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert.className = 'alert alert-success';
+            let msg = `<i class="fas fa-check-circle me-2"></i>Отчёт за ${data.month}/${data.year} сохранён: <strong>${data.saved}</strong> пользователей.`;
+            if (data.errors > 0) msg += ` Ошибок: <strong>${data.errors}</strong>.`;
+            alert.innerHTML = msg;
+        } else {
+            alert.className = 'alert alert-danger';
+            alert.innerHTML = `<i class="fas fa-exclamation-circle me-2"></i>${data.error || 'Ошибка при сохранении отчёта.'}`;
+        }
+    })
+    .catch(() => {
+        alert.className = 'alert alert-danger';
+        alert.innerHTML = '<i class="fas fa-exclamation-circle me-2"></i>Ошибка соединения. Попробуйте позже.';
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save me-1"></i> Сохранить месячный отчёт';
+    });
+});
 
 function shareReferralLink() {
     const referralLink = document.getElementById('referralLink')?.value ||
