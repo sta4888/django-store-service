@@ -11,7 +11,7 @@ from django.http import JsonResponse
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum
-from .models import Purchase, News
+from .models import Purchase, News, MonthlyReport
 from datetime import datetime, timedelta
 from accounts.models import CustomUser
 
@@ -617,6 +617,120 @@ def get_referral_details(request, user_id):
 
 
 
+
+
+@login_required
+def generate_monthly_report(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Метод не поддерживается'}, status=405)
+
+    from datetime import date
+    from django.db.models import Sum, Count
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    today = date.today()
+    year = today.year
+    month = today.month
+
+    # 1. Обходим всё дерево структуры (как в referral_tree_api)
+    all_users = []
+    visited = set()
+
+    def traverse(user):
+        if user.pk in visited:
+            return
+        visited.add(user.pk)
+        all_users.append(user)
+        for referral in CustomUser.objects.filter(referrer=user):
+            traverse(referral)
+
+    traverse(request.user)
+
+    # 2. Параллельно запрашиваем /status из FastAPI для каждого узла
+    def fetch_status(user):
+        try:
+            resp = requests.get(
+                f"{FASTAPI_SERVICE_URL}/user/users/{user.username}/status",
+                timeout=5
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                if not data.get('error'):
+                    return user.pk, data.get('data', {})
+        except Exception as e:
+            logger.warning(f"Не удалось получить статус для {user.username}: {e}")
+        return user.pk, {}
+
+    status_map = {}
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = {executor.submit(fetch_status, u): u for u in all_users}
+        for future in as_completed(futures):
+            pk, status = future.result()
+            status_map[pk] = status
+
+    # 3. Сохраняем MonthlyReport для каждого пользователя в структуре
+    saved = 0
+    errors = 0
+
+    for user in all_users:
+        st = status_map.get(user.pk, {})
+
+        purchases_agg = Purchase.objects.filter(
+            user=user, date__year=year, date__month=month
+        ).aggregate(
+            count=Count('id'),
+            amount=Sum('amount'),
+        )
+
+        new_referrals = CustomUser.objects.filter(
+            referrer=user,
+            date_joined__year=year,
+            date_joined__month=month,
+        ).count()
+
+        try:
+            MonthlyReport.objects.update_or_create(
+                user=user,
+                year=year,
+                month=month,
+                defaults={
+                    'personal_volume':        st.get('lo', 0) or 0,
+                    'group_volume':           st.get('go', 0) or 0,
+                    'side_volume':            st.get('side_volume', 0) or 0,
+                    'points':                 st.get('points', 0) or 0,
+                    'veron':                  st.get('veron', 0) or 0,
+                    'personal_bonus':         st.get('personal_bonus', 0) or 0,
+                    'structure_bonus':        st.get('structure_bonus', 0) or 0,
+                    'mentor_bonus':           st.get('mentor_bonus', 0) or 0,
+                    'extra_bonus':            st.get('extra_bonus', '') or '',
+                    'bonus_total':            sum(float(st.get(k, 0) or 0) for k in ('personal_bonus', 'structure_bonus', 'mentor_bonus')),
+                    'personal_money':         st.get('personal_money', 0) or 0,
+                    'group_money':            st.get('group_money', 0) or 0,
+                    'leader_money':           st.get('leader_money', 0) or 0,
+                    'side_vol_money':         st.get('side_vol_money', 0) or 0,
+                    'total_money':            st.get('total_money', 0) or 0,
+                    'total_income':           st.get('total_income', 0) or 0,
+                    'partner_level':          st.get('qualification', '') or '',
+                    'new_referrals':          new_referrals,
+                    'active_referrals_count': user.active_referrals,
+                    'purchases_count':        purchases_agg['count'] or 0,
+                    'purchases_amount':       purchases_agg['amount'] or 0,
+                }
+            )
+            saved += 1
+        except Exception as e:
+            logger.error(f"Ошибка сохранения отчёта для {user.username}: {e}")
+            errors += 1
+
+    logger.info(f"MonthlyReport: сохранено {saved}, ошибок {errors} ({month}/{year})")
+
+    return JsonResponse({
+        'success': True,
+        'saved': saved,
+        'errors': errors,
+        'month': month,
+        'year': year,
+    })
 
 
 ######################################################################################

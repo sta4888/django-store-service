@@ -20,6 +20,7 @@ urlpatterns = [
     path('api/referrals/', views.get_referrals_json, name='referrals_json'),
     path('api/referrals/tree/', views.referral_tree_api, name='referral_tree'),
     path('api/referrals/<str:user_id>/details/', views.get_referral_details, name='referral_details'),
+    path('api/monthly-report/generate/', views.generate_monthly_report, name='generate_monthly_report'),
 
     path('admin/', views.admin_panel, name='admin_page'),
 
