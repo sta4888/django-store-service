@@ -20,9 +20,19 @@
                 <div class="text-end">
                     <div class="text-muted small">ID партнера: {{ user.username }}</div>
                     <div class="text-muted small">Всего рефералов: {{ total_referrals }}</div>
-                    <button id="btn-save-report" class="btn btn-sm btn-outline-primary mt-2">
-                        <i class="fas fa-save me-1"></i> Сохранить месячный отчёт
+                    <button id="btn-save-report" class="btn btn-sm btn-outline-primary mt-2"
+                            {% if report_already_saved %}
+                            disabled
+                            title="Отчёт за этот месяц уже сохранён. Следующее сохранение доступно с {{ next_available_date|date:'d.m.Y' }}"
+                            {% endif %}>
+                        <i class="fas fa-{% if report_already_saved %}lock{% else %}save{% endif %} me-1"></i>
+                        {% if report_already_saved %}Отчёт сохранён{% else %}Сохранить месячный отчёт{% endif %}
                     </button>
+                    {% if report_already_saved %}
+                    <div class="text-muted small mt-1">
+                        <i class="fas fa-calendar-alt fa-xs me-1"></i>Следующее: {{ next_available_date|date:"d.m.Y" }}
+                    </div>
+                    {% endif %}
                 </div>
             </div>
 
@@ -999,6 +1009,7 @@ function showAlert(type, message) {
 document.getElementById('btn-save-report').addEventListener('click', function () {
     const btn = this;
     const alert = document.getElementById('report-alert');
+    let reportSaved = false;
 
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Сохранение...';
@@ -1014,6 +1025,8 @@ document.getElementById('btn-save-report').addEventListener('click', function ()
     .then(r => r.json())
     .then(data => {
         if (data.success) {
+            reportSaved = true;
+
             alert.className = 'alert alert-success';
             let msg = `<i class="fas fa-check-circle me-2"></i>Отчёт за ${data.month}/${data.year} сохранён: <strong>${data.saved}</strong> пользователей.`;
             if (data.errors > 0) msg += ` Ошибок при сохранении: <strong>${data.errors}</strong>.`;
@@ -1025,6 +1038,21 @@ document.getElementById('btn-save-report').addEventListener('click', function ()
                 msg += ` <span class="text-warning">Не удалось сбросить данные FastAPI: <strong>${data.reset_errors}</strong> ошибок.</span>`;
             }
             alert.innerHTML = msg;
+
+            // Вычисляем дату следующего доступного сохранения (1-е следующего месяца)
+            const now = new Date();
+            const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+            const nextDateStr = nextMonth.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+            // Блокируем кнопку до следующего месяца
+            btn.innerHTML = '<i class="fas fa-lock me-1"></i> Отчёт сохранён';
+            btn.title = `Следующее сохранение доступно с ${nextDateStr}`;
+
+            // Добавляем подпись под кнопкой
+            const lockHint = document.createElement('div');
+            lockHint.className = 'text-muted small mt-1';
+            lockHint.innerHTML = `<i class="fas fa-calendar-alt fa-xs me-1"></i>Следующее: ${nextDateStr}`;
+            btn.parentNode.appendChild(lockHint);
         } else {
             alert.className = 'alert alert-danger';
             alert.innerHTML = `<i class="fas fa-exclamation-circle me-2"></i>${data.error || 'Ошибка при сохранении отчёта.'}`;
@@ -1035,8 +1063,11 @@ document.getElementById('btn-save-report').addEventListener('click', function ()
         alert.innerHTML = '<i class="fas fa-exclamation-circle me-2"></i>Ошибка соединения. Попробуйте позже.';
     })
     .finally(() => {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-save me-1"></i> Сохранить месячный отчёт';
+        // Восстанавливаем кнопку только если сохранение не прошло (ошибка/сбой)
+        if (!reportSaved) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-save me-1"></i> Сохранить месячный отчёт';
+        }
     });
 });
 

@@ -264,30 +264,48 @@ def admin_panel(request):
 @login_required
 def structure_view(request):
     """Страница структуры рефералов пользователя"""
+    from datetime import date
+
     user = request.user
-    
+
     # Получаем рефералов первого уровня
     direct_referrals = CustomUser.objects.filter(
         referrer=user
     ).select_related('referrer').order_by('-date_joined')
-    
+
     # Пагинация
     paginator = Paginator(direct_referrals, 20)  # 20 записей на страницу
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-    
+
     # Получаем общую статистику
     total_referrals = user.total_referrals
     active_referrals = user.active_referrals
     group_volume = user.group_volume
-    
+
+    # Проверяем, был ли уже сохранён отчёт за текущий месяц
+    today = date.today()
+    report_already_saved = MonthlyReport.objects.filter(
+        user=user,
+        year=today.year,
+        month=today.month,
+    ).exists()
+
+    # Дата следующего доступного сохранения — 1-е число следующего месяца
+    if today.month == 12:
+        next_available_date = date(today.year + 1, 1, 1)
+    else:
+        next_available_date = date(today.year, today.month + 1, 1)
+
     context = {
         'direct_referrals': page_obj,
         'total_referrals': total_referrals,
         'active_referrals': active_referrals,
         'group_volume': group_volume,
+        'report_already_saved': report_already_saved,
+        'next_available_date': next_available_date,
     }
-    
+
     return render(request, 'cabinet/structure.html', context)
 
 
