@@ -26,7 +26,9 @@
                             title="Отчёт за этот месяц уже сохранён. Следующее сохранение доступно с {{ next_available_date|date:'d.m.Y' }}"
                             {% endif %}>
                         <i class="fas fa-{% if report_already_saved %}lock{% else %}save{% endif %} me-1"></i>
+                         {% if user.is_store or user.is_staff %}
                         {% if report_already_saved %}Отчёт сохранён{% else %}Сохранить месячный отчёт{% endif %}
+                        {% endif %}
                     </button>
                     {% if report_already_saved %}
                     <div class="text-muted small mt-1">
