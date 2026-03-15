@@ -475,11 +475,12 @@ def referral_tree_api(request):
     visited = set()
 
     users_with_extra_bonus = set(
-        MonthlyReport.objects.filter(
-            extra_bonus__isnull=False
-        ).exclude(
-            extra_bonus=''
-        ).values_list('user_id', flat=True)
+    MonthlyReport.objects.filter(
+        extra_bonus__isnull=False
+    ).exclude(
+        extra_bonus=''
+    ).values_list('user_id', flat=True)
+    )
 
     # ── 1. Обходим дерево Django БД, собираем базовые данные ───────
     def get_short_name(user):
