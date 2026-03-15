@@ -474,6 +474,13 @@ def referral_tree_api(request):
     edges = []
     visited = set()
 
+    users_with_extra_bonus = set(
+        MonthlyReport.objects.filter(
+            extra_bonus__isnull=False
+        ).exclude(
+            extra_bonus=''
+        ).values_list('user_id', flat=True)
+
     # ── 1. Обходим дерево Django БД, собираем базовые данные ───────
     def get_short_name(user):
         parts = [user.first_name, user.last_name]
@@ -554,6 +561,10 @@ def referral_tree_api(request):
     # ── 3. Обогащаем узлы данными из FastAPI ───────────────────────
     for node in nodes:
         st = status_map.get(node['id'], {})
+        
+        # Проверяем: получал ли этот юзер extra_bonus ранее
+        already_received = node['id'] in users_with_extra_bonus
+        
         if st:
             node['personal_volume'] = float(st.get('lo', 0) or 0)
             node['group_volume']    = float(st.get('go', 0) or 0)
@@ -564,7 +575,8 @@ def referral_tree_api(request):
             node['personal_bonus']  = st.get('personal_bonus', 0)
             node['structure_bonus'] = st.get('structure_bonus', 0)
             node['mentor_bonus']    = st.get('mentor_bonus', 0)
-            node['extra_bonus']     = st.get('extra_bonus', '')
+            # extra_bonus показываем только если ещё не получал ранее
+            node['extra_bonus']     = '' if already_received else st.get('extra_bonus', '')
             node['personal_money']  = st.get('personal_money', 0)
             node['group_money']     = st.get('group_money', 0)
             node['leader_money']    = st.get('leader_money', 0)
@@ -650,9 +662,21 @@ def generate_monthly_report(request):
     year = today.year
     month = today.month
 
-    # 1. Обходим всё дерево структуры (как в referral_tree_api)
+    # 1. Обходим всё дерево структуры
     all_users = []
     visited = set()
+
+    # ── Предзагружаем всех, кто УЖЕ получал extra_bonus ранее ──────
+    # Исключаем текущий месяц — смотрим только прошлые периоды
+    users_with_extra_bonus = set(
+        MonthlyReport.objects.filter(
+            extra_bonus__isnull=False
+        ).exclude(
+            extra_bonus=''
+        ).exclude(
+            year=year, month=month  # текущий месяц не считаем "ранее"
+        ).values_list('user_id', flat=True)
+    )  # ← закрывающая скобка была потеряна в оригинале
 
     def traverse(user):
         if user.pk in visited:
@@ -664,7 +688,7 @@ def generate_monthly_report(request):
 
     traverse(request.user)
 
-    # 2. Параллельно запрашиваем /status из FastAPI для каждого узла
+    # 2. Параллельно запрашиваем /status из FastAPI
     def fetch_status(user):
         try:
             resp = requests.get(
@@ -686,12 +710,16 @@ def generate_monthly_report(request):
             pk, status = future.result()
             status_map[pk] = status
 
-    # 3. Сохраняем MonthlyReport для каждого пользователя в структуре
+    # 3. Сохраняем MonthlyReport
     saved = 0
     errors = 0
 
     for user in all_users:
         st = status_map.get(user.pk, {})
+
+        # ── Если пользователь уже получал extra_bonus — не сохраняем ──
+        already_received = user.pk in users_with_extra_bonus
+        extra_bonus_value = '' if already_received else (st.get('extra_bonus', '') or '')
 
         purchases_agg = Purchase.objects.filter(
             user=user, date__year=year, date__month=month
@@ -720,7 +748,7 @@ def generate_monthly_report(request):
                     'personal_bonus':         st.get('personal_bonus', 0) or 0,
                     'structure_bonus':        st.get('structure_bonus', 0) or 0,
                     'mentor_bonus':           st.get('mentor_bonus', 0) or 0,
-                    'extra_bonus':            st.get('extra_bonus', '') or '',
+                    'extra_bonus':            extra_bonus_value,  # ← проверенное значение
                     'bonus_total':            sum(float(st.get(k, 0) or 0) for k in ('personal_bonus', 'structure_bonus', 'mentor_bonus')),
                     'personal_money':         st.get('personal_money', 0) or 0,
                     'group_money':            st.get('group_money', 0) or 0,
@@ -739,6 +767,8 @@ def generate_monthly_report(request):
         except Exception as e:
             logger.error(f"Ошибка сохранения отчёта для {user.username}: {e}")
             errors += 1
+
+    # ... остальной код (reset) без изменений ...
 
     logger.info(f"MonthlyReport: сохранено {saved}, ошибок {errors} ({month}/{year})")
 
