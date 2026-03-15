@@ -414,8 +414,6 @@ def get_referrals_json(request):
         'error': False
     })
 
-
-
 from datetime import date
 
 EXTRA_BONUS_RANK = {
@@ -438,6 +436,20 @@ def get_prev_month(today):
     return today.year, today.month - 1
 
 
+def build_best_extra_bonus_map():
+    """Возвращает {user_id: max_rank} за всю историю."""
+    best_map = {}
+    for user_id, extra_bonus in MonthlyReport.objects.exclude(
+        extra_bonus=''
+    ).exclude(
+        extra_bonus='-'
+    ).values_list('user_id', 'extra_bonus'):
+        rank = EXTRA_BONUS_RANK.get(extra_bonus, 0)
+        if rank > best_map.get(user_id, 0):
+            best_map[user_id] = rank
+    return best_map
+
+
 @login_required
 def referral_tree_api(request):
     """
@@ -451,19 +463,8 @@ def referral_tree_api(request):
     edges = []
     visited = set()
 
-    # ── Прошлый месяц ──────────────────────────────────────────────
-    today = date.today()
-    prev_year, prev_month = get_prev_month(today)
-
-    # Берём extra_bonus каждого пользователя за прошлый месяц
-    prev_extra_bonus_map = dict(
-        MonthlyReport.objects.filter(
-            year=prev_year,
-            month=prev_month,
-        ).exclude(
-            extra_bonus=''
-        ).values_list('user_id', 'extra_bonus')
-    )
+    # Максимальный ранг extra_bonus за всю историю для каждого пользователя
+    best_extra_bonus_map = build_best_extra_bonus_map()
 
     # ── 1. Обходим дерево Django БД, собираем базовые данные ───────
     def get_short_name(user):
@@ -543,32 +544,11 @@ def referral_tree_api(request):
     for node in nodes:
         st = status_map.get(node['id'], {})
 
+        # Проверяем extra_bonus — показываем только если выше лучшего за всё время
         current_extra = st.get('extra_bonus', '') or ''
-        prev_extra    = prev_extra_bonus_map.get(node['id'], '')
         current_rank  = EXTRA_BONUS_RANK.get(current_extra, 0)
-        prev_rank     = EXTRA_BONUS_RANK.get(prev_extra, 0)
-
-        # ── ОТЛАДКА — удалить после проверки ──
-        logger.warning(
-            f"USER {node['id']} | "
-            f"current_extra='{current_extra}' (rank={current_rank}) | "
-            f"prev_extra='{prev_extra}' (rank={prev_rank}) | "
-            f"show={current_rank > prev_rank}"
-        )
-        # ──────────────────────────────────────
-
-        node['extra_bonus'] = current_extra if current_rank > prev_rank else ''
-    for node in nodes:
-        
-        st = status_map.get(node['id'], {})
-
-        # Проверяем extra_bonus
-        current_extra = st.get('extra_bonus', '') or ''
-        prev_extra    = prev_extra_bonus_map.get(node['id'], '')
-        current_rank  = EXTRA_BONUS_RANK.get(current_extra, 0)
-        prev_rank     = EXTRA_BONUS_RANK.get(prev_extra, 0)
-        # Показываем только если текущий бонус ВЫШЕ прошлого
-        node['extra_bonus'] = current_extra if current_rank > prev_rank else ''
+        best_rank     = best_extra_bonus_map.get(node['id'], 0)
+        node['extra_bonus'] = current_extra if current_rank > best_rank else ''
 
         if st:
             node['personal_volume'] = float(st.get('lo', 0) or 0)
@@ -602,17 +582,19 @@ def generate_monthly_report(request):
     today = date.today()
     year  = today.year
     month = today.month
-    prev_year, prev_month = get_prev_month(today)
 
-    # ── Прошлый месяц — для проверки extra_bonus ───────────────────
-    prev_extra_bonus_map = dict(
-        MonthlyReport.objects.filter(
-            year=prev_year,
-            month=prev_month,
-        ).exclude(
-            extra_bonus=''
-        ).values_list('user_id', 'extra_bonus')
-    )
+    # Максимальный ранг extra_bonus за всю историю (исключая текущий месяц)
+    best_extra_bonus_map = {}
+    for user_id, extra_bonus in MonthlyReport.objects.exclude(
+        extra_bonus=''
+    ).exclude(
+        extra_bonus='-'
+    ).exclude(
+        year=year, month=month  # текущий месяц не считаем
+    ).values_list('user_id', 'extra_bonus'):
+        rank = EXTRA_BONUS_RANK.get(extra_bonus, 0)
+        if rank > best_extra_bonus_map.get(user_id, 0):
+            best_extra_bonus_map[user_id] = rank
 
     # ── 1. Обходим всё дерево структуры ────────────────────────────
     all_users = []
@@ -657,13 +639,11 @@ def generate_monthly_report(request):
     for user in all_users:
         st = status_map.get(user.pk, {})
 
-        # Проверяем extra_bonus
+        # Проверяем extra_bonus — сохраняем только если выше лучшего за всё время
         current_extra = st.get('extra_bonus', '') or ''
-        prev_extra    = prev_extra_bonus_map.get(user.pk, '')
         current_rank  = EXTRA_BONUS_RANK.get(current_extra, 0)
-        prev_rank     = EXTRA_BONUS_RANK.get(prev_extra, 0)
-        # Сохраняем только если текущий бонус ВЫШЕ прошлого
-        extra_bonus_value = current_extra if current_rank > prev_rank else ''
+        best_rank     = best_extra_bonus_map.get(user.pk, 0)
+        extra_bonus_value = current_extra if current_rank > best_rank else ''
 
         purchases_agg = Purchase.objects.filter(
             user=user, date__year=year, date__month=month
@@ -752,7 +732,6 @@ def generate_monthly_report(request):
         'reset_ok':     reset_ok,
         'reset_errors': reset_errors,
     })
-
 
 
 def get_referral_details(request, user_id):
