@@ -414,6 +414,7 @@ def get_referrals_json(request):
         'error': False
     })
 
+
 from datetime import date
 
 EXTRA_BONUS_RANK = {
@@ -443,7 +444,7 @@ def build_best_extra_bonus_map():
         extra_bonus=''
     ).exclude(
         extra_bonus='-'
-    ).values_list('user_id', 'extra_bonus'):
+    ).values_list('user__user_id', 'extra_bonus'):  # ← user__user_id
         rank = EXTRA_BONUS_RANK.get(extra_bonus, 0)
         if rank > best_map.get(user_id, 0):
             best_map[user_id] = rank
@@ -452,21 +453,14 @@ def build_best_extra_bonus_map():
 
 @login_required
 def referral_tree_api(request):
-    """
-    Возвращает дерево рефералов.
-    Для каждого узла параллельно запрашивает /status из FastAPI
-    чтобы получить актуальные lo, go, qualification и бонусы.
-    """
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
     nodes = []
     edges = []
     visited = set()
 
-    # Максимальный ранг extra_bonus за всю историю для каждого пользователя
     best_extra_bonus_map = build_best_extra_bonus_map()
 
-    # ── 1. Обходим дерево Django БД, собираем базовые данные ───────
     def get_short_name(user):
         parts = [user.first_name, user.last_name]
         name = ' '.join(p for p in parts if p).strip()
@@ -516,7 +510,6 @@ def referral_tree_api(request):
 
     traverse(request.user, level=0)
 
-    # ── 2. Параллельно запрашиваем /status для каждого узла ────────
     def fetch_status(user_id):
         try:
             resp = requests.get(
@@ -540,11 +533,9 @@ def referral_tree_api(request):
             uid, status = future.result()
             status_map[uid] = status
 
-    # ── 3. Обогащаем узлы данными из FastAPI ───────────────────────
     for node in nodes:
         st = status_map.get(node['id'], {})
 
-        # Проверяем extra_bonus — показываем только если выше лучшего за всё время
         current_extra = st.get('extra_bonus', '') or ''
         current_rank  = EXTRA_BONUS_RANK.get(current_extra, 0)
         best_rank     = best_extra_bonus_map.get(node['id'], 0)
@@ -583,20 +574,19 @@ def generate_monthly_report(request):
     year  = today.year
     month = today.month
 
-    # Максимальный ранг extra_bonus за всю историю (исключая текущий месяц)
+    # Максимальный ранг extra_bonus за всю историю исключая текущий месяц
     best_extra_bonus_map = {}
     for user_id, extra_bonus in MonthlyReport.objects.exclude(
         extra_bonus=''
     ).exclude(
         extra_bonus='-'
     ).exclude(
-        year=year, month=month  # текущий месяц не считаем
-    ).values_list('user_id', 'extra_bonus'):
+        year=year, month=month
+    ).values_list('user__user_id', 'extra_bonus'):  # ← user__user_id
         rank = EXTRA_BONUS_RANK.get(extra_bonus, 0)
         if rank > best_extra_bonus_map.get(user_id, 0):
             best_extra_bonus_map[user_id] = rank
 
-    # ── 1. Обходим всё дерево структуры ────────────────────────────
     all_users = []
     visited   = set()
 
@@ -610,7 +600,6 @@ def generate_monthly_report(request):
 
     traverse(request.user)
 
-    # ── 2. Параллельно запрашиваем /status из FastAPI ──────────────
     def fetch_status(user):
         try:
             resp = requests.get(
@@ -632,17 +621,15 @@ def generate_monthly_report(request):
             pk, status = future.result()
             status_map[pk] = status
 
-    # ── 3. Сохраняем MonthlyReport ─────────────────────────────────
     saved  = 0
     errors = 0
 
     for user in all_users:
         st = status_map.get(user.pk, {})
 
-        # Проверяем extra_bonus — сохраняем только если выше лучшего за всё время
         current_extra = st.get('extra_bonus', '') or ''
         current_rank  = EXTRA_BONUS_RANK.get(current_extra, 0)
-        best_rank     = best_extra_bonus_map.get(user.pk, 0)
+        best_rank     = best_extra_bonus_map.get(user.user_id, 0)  # ← user.user_id
         extra_bonus_value = current_extra if current_rank > best_rank else ''
 
         purchases_agg = Purchase.objects.filter(
@@ -694,7 +681,6 @@ def generate_monthly_report(request):
 
     logger.info(f"MonthlyReport: сохранено {saved}, ошибок {errors} ({month}/{year})")
 
-    # ── 4. Параллельно сбрасываем данные в FastAPI ─────────────────
     def reset_user_data(user):
         try:
             resp = requests.post(
