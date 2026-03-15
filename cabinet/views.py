@@ -20,6 +20,8 @@ from .services.fastapi_service import FastAPIService
 logger = logging.getLogger(__name__)
 
 
+
+
 @login_required
 def dashboard_view(request):
     stats = {}
@@ -56,53 +58,6 @@ def purchases_view(request):
 def finance_view(request):
     return render(request, 'cabinet/finance.html')
 
-
-# @login_required
-# def refresh_stats(request):
-#     """Обновление статистики по AJAX запросу"""
-#     if request.method == 'POST':
-#         try:
-#             data = json.loads(request.body)
-#             force_refresh = data.get('force', False)
-#         except:
-#             force_refresh = False
-#
-#     service = FastAPIService()
-#     user_stats = service.get_user_stats(request.user.username, force_refresh=force_refresh)
-#
-#     if user_stats is None:
-#         # Запускаем асинхронное обновление
-#         task = update_user_stats_cache.delay(request.user.username)
-#         return JsonResponse({
-#             'status': 'updating',
-#             'message': 'Данные обновляются...',
-#             'task_id': str(task.id)
-#         })
-#
-#     return JsonResponse({
-#         'status': 'success',
-#         'data': user_stats,
-#         'refreshed': True
-#     })
-#
-#
-# @login_required
-# def get_stats_json(request):
-#     user_id = request.user.username
-#     cache_key = f"user:stats:{user_id}"
-#
-#     stats = cache.get(cache_key)
-#
-#     if not stats:
-#         update_user_stats_cache.delay(user_id)
-#         return JsonResponse(
-#             {"status": "loading"},
-#             status=202
-#         )
-#
-#     return JsonResponse(
-#         {"status": "ok", "data": stats}
-#     )
 
 
 @login_required
@@ -461,6 +416,28 @@ def get_referrals_json(request):
 
 
 
+from datetime import date
+
+EXTRA_BONUS_RANK = {
+    "-":                     0,
+    "Par dazmol":            1,
+    "Changyutgich":          2,
+    "Televizor smart-32":    3,
+    "Gaz plita":             4,
+    "Konditsioner":          5,
+    "Kir yuvadigan mashina": 6,
+    "Chet el sayohati":      7,
+    "Onix avtomobili":       8,
+    "Chery Tigo 7 Pro Max":  9,
+}
+
+
+def get_prev_month(today):
+    if today.month == 1:
+        return today.year - 1, 12
+    return today.year, today.month - 1
+
+
 @login_required
 def referral_tree_api(request):
     """
@@ -474,12 +451,18 @@ def referral_tree_api(request):
     edges = []
     visited = set()
 
-    users_with_extra_bonus = set(
-    MonthlyReport.objects.filter(
-        extra_bonus__isnull=False
-    ).exclude(
-        extra_bonus=''
-    ).values_list('user_id', flat=True)
+    # ── Прошлый месяц ──────────────────────────────────────────────
+    today = date.today()
+    prev_year, prev_month = get_prev_month(today)
+
+    # Берём extra_bonus каждого пользователя за прошлый месяц
+    prev_extra_bonus_map = dict(
+        MonthlyReport.objects.filter(
+            year=prev_year,
+            month=prev_month,
+        ).exclude(
+            extra_bonus=''
+        ).values_list('user_id', 'extra_bonus')
     )
 
     # ── 1. Обходим дерево Django БД, собираем базовые данные ───────
@@ -499,32 +482,30 @@ def referral_tree_api(request):
         visited.add(user.pk)
 
         nodes.append({
-            'id':            user.user_id,
-            'label':         get_short_name(user),
-            'title':         get_full_name(user),
-            'level':         level,
-            'active':        getattr(user, 'is_active', True),
-            'user_type':     getattr(user, 'user_type', 'partner'),
-            # Временные значения — перезапишем из FastAPI ниже
+            'id':              user.user_id,
+            'label':           get_short_name(user),
+            'title':           get_full_name(user),
+            'level':           level,
+            'active':          getattr(user, 'is_active', True),
+            'user_type':       getattr(user, 'user_type', 'partner'),
             'personal_volume': 0.0,
             'group_volume':    0.0,
             'partner_level':   getattr(user, 'partner_level', ''),
             'total_referrals': getattr(user, 'total_referrals', 0),
-            # Дополнительные поля из /status
-            'qualification':     '',
-            'side_volume':       0,
-            'points':            0,
-            'personal_bonus':    0,
-            'structure_bonus':   0,
-            'mentor_bonus':      0,
-            'extra_bonus':       '',
-            'personal_money':    0,
-            'group_money':       0,
-            'leader_money':      0,
-            'side_vol_money':    0,
-            'total_money':       0,
-            'veron':             0,
-            'total_income':      0,
+            'qualification':   '',
+            'side_volume':     0,
+            'points':          0,
+            'personal_bonus':  0,
+            'structure_bonus': 0,
+            'mentor_bonus':    0,
+            'extra_bonus':     '',
+            'personal_money':  0,
+            'group_money':     0,
+            'leader_money':    0,
+            'side_vol_money':  0,
+            'total_money':     0,
+            'veron':           0,
+            'total_income':    0,
         })
 
         referrals = CustomUser.objects.filter(referrer=user)
@@ -549,7 +530,6 @@ def referral_tree_api(request):
             logger.warning(f"Не удалось получить статус для {user_id}: {e}")
         return user_id, {}
 
-    # Запускаем параллельно (макс 10 потоков)
     user_ids = [n['id'] for n in nodes]
     status_map = {}
 
@@ -562,10 +542,15 @@ def referral_tree_api(request):
     # ── 3. Обогащаем узлы данными из FastAPI ───────────────────────
     for node in nodes:
         st = status_map.get(node['id'], {})
-        
-        # Проверяем: получал ли этот юзер extra_bonus ранее
-        already_received = node['id'] in users_with_extra_bonus
-        
+
+        # Проверяем extra_bonus
+        current_extra = st.get('extra_bonus', '') or ''
+        prev_extra    = prev_extra_bonus_map.get(node['id'], '')
+        current_rank  = EXTRA_BONUS_RANK.get(current_extra, 0)
+        prev_rank     = EXTRA_BONUS_RANK.get(prev_extra, 0)
+        # Показываем только если текущий бонус ВЫШЕ прошлого
+        node['extra_bonus'] = current_extra if current_rank > prev_rank else ''
+
         if st:
             node['personal_volume'] = float(st.get('lo', 0) or 0)
             node['group_volume']    = float(st.get('go', 0) or 0)
@@ -576,8 +561,6 @@ def referral_tree_api(request):
             node['personal_bonus']  = st.get('personal_bonus', 0)
             node['structure_bonus'] = st.get('structure_bonus', 0)
             node['mentor_bonus']    = st.get('mentor_bonus', 0)
-            # extra_bonus показываем только если ещё не получал ранее
-            node['extra_bonus']     = '' if already_received else st.get('extra_bonus', '')
             node['personal_money']  = st.get('personal_money', 0)
             node['group_money']     = st.get('group_money', 0)
             node['leader_money']    = st.get('leader_money', 0)
@@ -587,6 +570,169 @@ def referral_tree_api(request):
             node['total_income']    = st.get('total_income', 0)
 
     return JsonResponse({'nodes': nodes, 'edges': edges})
+
+
+@login_required
+def generate_monthly_report(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Метод не поддерживается'}, status=405)
+
+    from django.db.models import Sum, Count
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    today = date.today()
+    year  = today.year
+    month = today.month
+    prev_year, prev_month = get_prev_month(today)
+
+    # ── Прошлый месяц — для проверки extra_bonus ───────────────────
+    prev_extra_bonus_map = dict(
+        MonthlyReport.objects.filter(
+            year=prev_year,
+            month=prev_month,
+        ).exclude(
+            extra_bonus=''
+        ).values_list('user_id', 'extra_bonus')
+    )
+
+    # ── 1. Обходим всё дерево структуры ────────────────────────────
+    all_users = []
+    visited   = set()
+
+    def traverse(user):
+        if user.pk in visited:
+            return
+        visited.add(user.pk)
+        all_users.append(user)
+        for referral in CustomUser.objects.filter(referrer=user):
+            traverse(referral)
+
+    traverse(request.user)
+
+    # ── 2. Параллельно запрашиваем /status из FastAPI ──────────────
+    def fetch_status(user):
+        try:
+            resp = requests.get(
+                f"{FASTAPI_SERVICE_URL}/user/users/{user.username}/status",
+                timeout=5
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                if not data.get('error'):
+                    return user.pk, data.get('data', {})
+        except Exception as e:
+            logger.warning(f"Не удалось получить статус для {user.username}: {e}")
+        return user.pk, {}
+
+    status_map = {}
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = {executor.submit(fetch_status, u): u for u in all_users}
+        for future in as_completed(futures):
+            pk, status = future.result()
+            status_map[pk] = status
+
+    # ── 3. Сохраняем MonthlyReport ─────────────────────────────────
+    saved  = 0
+    errors = 0
+
+    for user in all_users:
+        st = status_map.get(user.pk, {})
+
+        # Проверяем extra_bonus
+        current_extra = st.get('extra_bonus', '') or ''
+        prev_extra    = prev_extra_bonus_map.get(user.pk, '')
+        current_rank  = EXTRA_BONUS_RANK.get(current_extra, 0)
+        prev_rank     = EXTRA_BONUS_RANK.get(prev_extra, 0)
+        # Сохраняем только если текущий бонус ВЫШЕ прошлого
+        extra_bonus_value = current_extra if current_rank > prev_rank else ''
+
+        purchases_agg = Purchase.objects.filter(
+            user=user, date__year=year, date__month=month
+        ).aggregate(
+            count=Count('id'),
+            amount=Sum('amount'),
+        )
+
+        new_referrals = CustomUser.objects.filter(
+            referrer=user,
+            date_joined__year=year,
+            date_joined__month=month,
+        ).count()
+
+        try:
+            MonthlyReport.objects.update_or_create(
+                user=user,
+                year=year,
+                month=month,
+                defaults={
+                    'personal_volume':        st.get('lo', 0) or 0,
+                    'group_volume':           st.get('go', 0) or 0,
+                    'side_volume':            st.get('side_volume', 0) or 0,
+                    'points':                 st.get('points', 0) or 0,
+                    'veron':                  st.get('veron', 0) or 0,
+                    'personal_bonus':         st.get('personal_bonus', 0) or 0,
+                    'structure_bonus':        st.get('structure_bonus', 0) or 0,
+                    'mentor_bonus':           st.get('mentor_bonus', 0) or 0,
+                    'extra_bonus':            extra_bonus_value,
+                    'bonus_total':            sum(float(st.get(k, 0) or 0) for k in ('personal_bonus', 'structure_bonus', 'mentor_bonus')),
+                    'personal_money':         st.get('personal_money', 0) or 0,
+                    'group_money':            st.get('group_money', 0) or 0,
+                    'leader_money':           st.get('leader_money', 0) or 0,
+                    'side_vol_money':         st.get('side_vol_money', 0) or 0,
+                    'total_money':            st.get('total_money', 0) or 0,
+                    'total_income':           st.get('total_income', 0) or 0,
+                    'partner_level':          st.get('qualification', '') or '',
+                    'new_referrals':          new_referrals,
+                    'active_referrals_count': user.active_referrals,
+                    'purchases_count':        purchases_agg['count'] or 0,
+                    'purchases_amount':       purchases_agg['amount'] or 0,
+                }
+            )
+            saved += 1
+        except Exception as e:
+            logger.error(f"Ошибка сохранения отчёта для {user.username}: {e}")
+            errors += 1
+
+    logger.info(f"MonthlyReport: сохранено {saved}, ошибок {errors} ({month}/{year})")
+
+    # ── 4. Параллельно сбрасываем данные в FastAPI ─────────────────
+    def reset_user_data(user):
+        try:
+            resp = requests.post(
+                f"{FASTAPI_SERVICE_URL}/user/users/{user.username}/reset",
+                timeout=5
+            )
+            if resp.status_code == 200:
+                payload = resp.json()
+                if not payload.get('error'):
+                    return user.pk, True
+        except Exception as e:
+            logger.warning(f"Не удалось сбросить данные для {user.username}: {e}")
+        return user.pk, False
+
+    reset_ok     = 0
+    reset_errors = 0
+
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        reset_futures = {executor.submit(reset_user_data, u): u for u in all_users}
+        for future in as_completed(reset_futures):
+            _pk, success = future.result()
+            if success:
+                reset_ok += 1
+            else:
+                reset_errors += 1
+
+    logger.info(f"FastAPI reset: успешно {reset_ok}, ошибок {reset_errors} ({month}/{year})")
+
+    return JsonResponse({
+        'success':      True,
+        'saved':        saved,
+        'errors':       errors,
+        'month':        month,
+        'year':         year,
+        'reset_ok':     reset_ok,
+        'reset_errors': reset_errors,
+    })
 
 
 
@@ -650,167 +796,6 @@ def get_referral_details(request, user_id):
 
 
 
-@login_required
-def generate_monthly_report(request):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'Метод не поддерживается'}, status=405)
-
-    from datetime import date
-    from django.db.models import Sum, Count
-    from concurrent.futures import ThreadPoolExecutor, as_completed
-
-    today = date.today()
-    year = today.year
-    month = today.month
-
-    # 1. Обходим всё дерево структуры
-    all_users = []
-    visited = set()
-
-    # ── Предзагружаем всех, кто УЖЕ получал extra_bonus ранее ──────
-    # Исключаем текущий месяц — смотрим только прошлые периоды
-    users_with_extra_bonus = set(
-        MonthlyReport.objects.filter(
-            extra_bonus__isnull=False
-        ).exclude(
-            extra_bonus=''
-        ).exclude(
-            year=year, month=month  # текущий месяц не считаем "ранее"
-        ).values_list('user_id', flat=True)
-    )  # ← закрывающая скобка была потеряна в оригинале
-
-    def traverse(user):
-        if user.pk in visited:
-            return
-        visited.add(user.pk)
-        all_users.append(user)
-        for referral in CustomUser.objects.filter(referrer=user):
-            traverse(referral)
-
-    traverse(request.user)
-
-    # 2. Параллельно запрашиваем /status из FastAPI
-    def fetch_status(user):
-        try:
-            resp = requests.get(
-                f"{FASTAPI_SERVICE_URL}/user/users/{user.username}/status",
-                timeout=5
-            )
-            if resp.status_code == 200:
-                data = resp.json()
-                if not data.get('error'):
-                    return user.pk, data.get('data', {})
-        except Exception as e:
-            logger.warning(f"Не удалось получить статус для {user.username}: {e}")
-        return user.pk, {}
-
-    status_map = {}
-    with ThreadPoolExecutor(max_workers=10) as executor:
-        futures = {executor.submit(fetch_status, u): u for u in all_users}
-        for future in as_completed(futures):
-            pk, status = future.result()
-            status_map[pk] = status
-
-    # 3. Сохраняем MonthlyReport
-    saved = 0
-    errors = 0
-
-    for user in all_users:
-        st = status_map.get(user.pk, {})
-
-        # ── Если пользователь уже получал extra_bonus — не сохраняем ──
-        already_received = user.pk in users_with_extra_bonus
-        extra_bonus_value = '' if already_received else (st.get('extra_bonus', '') or '')
-
-        purchases_agg = Purchase.objects.filter(
-            user=user, date__year=year, date__month=month
-        ).aggregate(
-            count=Count('id'),
-            amount=Sum('amount'),
-        )
-
-        new_referrals = CustomUser.objects.filter(
-            referrer=user,
-            date_joined__year=year,
-            date_joined__month=month,
-        ).count()
-
-        try:
-            MonthlyReport.objects.update_or_create(
-                user=user,
-                year=year,
-                month=month,
-                defaults={
-                    'personal_volume':        st.get('lo', 0) or 0,
-                    'group_volume':           st.get('go', 0) or 0,
-                    'side_volume':            st.get('side_volume', 0) or 0,
-                    'points':                 st.get('points', 0) or 0,
-                    'veron':                  st.get('veron', 0) or 0,
-                    'personal_bonus':         st.get('personal_bonus', 0) or 0,
-                    'structure_bonus':        st.get('structure_bonus', 0) or 0,
-                    'mentor_bonus':           st.get('mentor_bonus', 0) or 0,
-                    'extra_bonus':            extra_bonus_value,  # ← проверенное значение
-                    'bonus_total':            sum(float(st.get(k, 0) or 0) for k in ('personal_bonus', 'structure_bonus', 'mentor_bonus')),
-                    'personal_money':         st.get('personal_money', 0) or 0,
-                    'group_money':            st.get('group_money', 0) or 0,
-                    'leader_money':           st.get('leader_money', 0) or 0,
-                    'side_vol_money':         st.get('side_vol_money', 0) or 0,
-                    'total_money':            st.get('total_money', 0) or 0,
-                    'total_income':           st.get('total_income', 0) or 0,
-                    'partner_level':          st.get('qualification', '') or '',
-                    'new_referrals':          new_referrals,
-                    'active_referrals_count': user.active_referrals,
-                    'purchases_count':        purchases_agg['count'] or 0,
-                    'purchases_amount':       purchases_agg['amount'] or 0,
-                }
-            )
-            saved += 1
-        except Exception as e:
-            logger.error(f"Ошибка сохранения отчёта для {user.username}: {e}")
-            errors += 1
-
-    # ... остальной код (reset) без изменений ...
-
-    logger.info(f"MonthlyReport: сохранено {saved}, ошибок {errors} ({month}/{year})")
-
-    # 4. Параллельно сбрасываем данные в FastAPI для каждого пользователя
-    def reset_user_data(user):
-        try:
-            resp = requests.post(
-                f"{FASTAPI_SERVICE_URL}/user/users/{user.username}/reset",
-                timeout=5
-            )
-            if resp.status_code == 200:
-                payload = resp.json()
-                if not payload.get('error'):
-                    return user.pk, True
-        except Exception as e:
-            logger.warning(f"Не удалось сбросить данные для {user.username}: {e}")
-        return user.pk, False
-
-    reset_ok = 0
-    reset_errors = 0
-
-    with ThreadPoolExecutor(max_workers=10) as executor:
-        reset_futures = {executor.submit(reset_user_data, u): u for u in all_users}
-        for future in as_completed(reset_futures):
-            _pk, success = future.result()
-            if success:
-                reset_ok += 1
-            else:
-                reset_errors += 1
-
-    logger.info(f"FastAPI reset: успешно {reset_ok}, ошибок {reset_errors} ({month}/{year})")
-
-    return JsonResponse({
-        'success': True,
-        'saved': saved,
-        'errors': errors,
-        'month': month,
-        'year': year,
-        'reset_ok': reset_ok,
-        'reset_errors': reset_errors,
-    })
 
 
 ######################################################################################
@@ -1014,3 +999,218 @@ def settings_view(request):
         'profile_form': profile_form,
         'password_form': password_form,
     })
+
+
+
+
+# @login_required
+# def generate_monthly_report(request):
+#     if request.method != 'POST':
+#         return JsonResponse({'error': 'Метод не поддерживается'}, status=405)
+
+#     from datetime import date
+#     from django.db.models import Sum, Count
+#     from concurrent.futures import ThreadPoolExecutor, as_completed
+
+#     today = date.today()
+#     year = today.year
+#     month = today.month
+
+#     # 1. Обходим всё дерево структуры
+#     all_users = []
+#     visited = set()
+
+#     # ── Предзагружаем всех, кто УЖЕ получал extra_bonus ранее ──────
+#     # Исключаем текущий месяц — смотрим только прошлые периоды
+#     users_with_extra_bonus = set(
+#         MonthlyReport.objects.filter(
+#             extra_bonus__isnull=False
+#         ).exclude(
+#             extra_bonus=''
+#         ).exclude(
+#             year=year, month=month  # текущий месяц не считаем "ранее"
+#         ).values_list('user_id', flat=True)
+#     )  # ← закрывающая скобка была потеряна в оригинале
+
+#     def traverse(user):
+#         if user.pk in visited:
+#             return
+#         visited.add(user.pk)
+#         all_users.append(user)
+#         for referral in CustomUser.objects.filter(referrer=user):
+#             traverse(referral)
+
+#     traverse(request.user)
+
+#     # 2. Параллельно запрашиваем /status из FastAPI
+#     def fetch_status(user):
+#         try:
+#             resp = requests.get(
+#                 f"{FASTAPI_SERVICE_URL}/user/users/{user.username}/status",
+#                 timeout=5
+#             )
+#             if resp.status_code == 200:
+#                 data = resp.json()
+#                 if not data.get('error'):
+#                     return user.pk, data.get('data', {})
+#         except Exception as e:
+#             logger.warning(f"Не удалось получить статус для {user.username}: {e}")
+#         return user.pk, {}
+
+#     status_map = {}
+#     with ThreadPoolExecutor(max_workers=10) as executor:
+#         futures = {executor.submit(fetch_status, u): u for u in all_users}
+#         for future in as_completed(futures):
+#             pk, status = future.result()
+#             status_map[pk] = status
+
+#     # 3. Сохраняем MonthlyReport
+#     saved = 0
+#     errors = 0
+
+#     for user in all_users:
+#         st = status_map.get(user.pk, {})
+
+#         # ── Если пользователь уже получал extra_bonus — не сохраняем ──
+#         already_received = user.pk in users_with_extra_bonus
+#         extra_bonus_value = '' if already_received else (st.get('extra_bonus', '') or '')
+
+#         purchases_agg = Purchase.objects.filter(
+#             user=user, date__year=year, date__month=month
+#         ).aggregate(
+#             count=Count('id'),
+#             amount=Sum('amount'),
+#         )
+
+#         new_referrals = CustomUser.objects.filter(
+#             referrer=user,
+#             date_joined__year=year,
+#             date_joined__month=month,
+#         ).count()
+
+#         try:
+#             MonthlyReport.objects.update_or_create(
+#                 user=user,
+#                 year=year,
+#                 month=month,
+#                 defaults={
+#                     'personal_volume':        st.get('lo', 0) or 0,
+#                     'group_volume':           st.get('go', 0) or 0,
+#                     'side_volume':            st.get('side_volume', 0) or 0,
+#                     'points':                 st.get('points', 0) or 0,
+#                     'veron':                  st.get('veron', 0) or 0,
+#                     'personal_bonus':         st.get('personal_bonus', 0) or 0,
+#                     'structure_bonus':        st.get('structure_bonus', 0) or 0,
+#                     'mentor_bonus':           st.get('mentor_bonus', 0) or 0,
+#                     'extra_bonus':            extra_bonus_value,  # ← проверенное значение
+#                     'bonus_total':            sum(float(st.get(k, 0) or 0) for k in ('personal_bonus', 'structure_bonus', 'mentor_bonus')),
+#                     'personal_money':         st.get('personal_money', 0) or 0,
+#                     'group_money':            st.get('group_money', 0) or 0,
+#                     'leader_money':           st.get('leader_money', 0) or 0,
+#                     'side_vol_money':         st.get('side_vol_money', 0) or 0,
+#                     'total_money':            st.get('total_money', 0) or 0,
+#                     'total_income':           st.get('total_income', 0) or 0,
+#                     'partner_level':          st.get('qualification', '') or '',
+#                     'new_referrals':          new_referrals,
+#                     'active_referrals_count': user.active_referrals,
+#                     'purchases_count':        purchases_agg['count'] or 0,
+#                     'purchases_amount':       purchases_agg['amount'] or 0,
+#                 }
+#             )
+#             saved += 1
+#         except Exception as e:
+#             logger.error(f"Ошибка сохранения отчёта для {user.username}: {e}")
+#             errors += 1
+
+#     # ... остальной код (reset) без изменений ...
+
+#     logger.info(f"MonthlyReport: сохранено {saved}, ошибок {errors} ({month}/{year})")
+
+#     # 4. Параллельно сбрасываем данные в FastAPI для каждого пользователя
+#     def reset_user_data(user):
+#         try:
+#             resp = requests.post(
+#                 f"{FASTAPI_SERVICE_URL}/user/users/{user.username}/reset",
+#                 timeout=5
+#             )
+#             if resp.status_code == 200:
+#                 payload = resp.json()
+#                 if not payload.get('error'):
+#                     return user.pk, True
+#         except Exception as e:
+#             logger.warning(f"Не удалось сбросить данные для {user.username}: {e}")
+#         return user.pk, False
+
+#     reset_ok = 0
+#     reset_errors = 0
+
+#     with ThreadPoolExecutor(max_workers=10) as executor:
+#         reset_futures = {executor.submit(reset_user_data, u): u for u in all_users}
+#         for future in as_completed(reset_futures):
+#             _pk, success = future.result()
+#             if success:
+#                 reset_ok += 1
+#             else:
+#                 reset_errors += 1
+
+#     logger.info(f"FastAPI reset: успешно {reset_ok}, ошибок {reset_errors} ({month}/{year})")
+
+#     return JsonResponse({
+#         'success': True,
+#         'saved': saved,
+#         'errors': errors,
+#         'month': month,
+#         'year': year,
+#         'reset_ok': reset_ok,
+#         'reset_errors': reset_errors,
+#     })
+
+
+
+
+# @login_required
+# def refresh_stats(request):
+#     """Обновление статистики по AJAX запросу"""
+#     if request.method == 'POST':
+#         try:
+#             data = json.loads(request.body)
+#             force_refresh = data.get('force', False)
+#         except:
+#             force_refresh = False
+#
+#     service = FastAPIService()
+#     user_stats = service.get_user_stats(request.user.username, force_refresh=force_refresh)
+#
+#     if user_stats is None:
+#         # Запускаем асинхронное обновление
+#         task = update_user_stats_cache.delay(request.user.username)
+#         return JsonResponse({
+#             'status': 'updating',
+#             'message': 'Данные обновляются...',
+#             'task_id': str(task.id)
+#         })
+#
+#     return JsonResponse({
+#         'status': 'success',
+#         'data': user_stats,
+#         'refreshed': True
+#     })
+#
+#
+# @login_required
+# def get_stats_json(request):
+#     user_id = request.user.username
+#     cache_key = f"user:stats:{user_id}"
+#
+#     stats = cache.get(cache_key)
+#
+#     if not stats:
+#         update_user_stats_cache.delay(user_id)
+#         return JsonResponse(
+#             {"status": "loading"},
+#             status=202
+#         )
+#
+#     return JsonResponse(
+#         {"status": "ok", "data": stats}
+#     )
