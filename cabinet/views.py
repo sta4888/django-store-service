@@ -577,7 +577,7 @@ def referral_tree_api(request):
             node['structure_bonus'] = st.get('structure_bonus', 0)
             node['mentor_bonus']    = st.get('mentor_bonus', 0)
             # extra_bonus показываем только если ещё не получал ранее
-            node['extra_bonus']     = '' if already_received else st.get('extra_bonus', '')
+            node['extra_bonus']     = ''
             node['personal_money']  = st.get('personal_money', 0)
             node['group_money']     = st.get('group_money', 0)
             node['leader_money']    = st.get('leader_money', 0)
