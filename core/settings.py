@@ -16,7 +16,7 @@ DEBUG = True
 
 SECURE_CROSS_ORIGIN_OPENER_POLICY = None
 
-ALLOWED_HOSTS = ["45.130.148.158", "localhost", "45.130.148.146", "www.everonuz.com", "everonuz.com", "api.ipify.org"]
+ALLOWED_HOSTS = ["45.130.148.158", "localhost", "45.130.148.146", "www.everonuz.com", "everonuz.com", "api.ipify.org", "www.google.com"]
 
 CSRF_TRUSTED_ORIGINS = [
     "https://everonuz.com",

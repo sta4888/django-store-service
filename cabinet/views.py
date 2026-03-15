@@ -541,23 +541,23 @@ def referral_tree_api(request):
 
     # ── 3. Обогащаем узлы данными из FastAPI ───────────────────────
     for node in nodes:
-    st = status_map.get(node['id'], {})
+        st = status_map.get(node['id'], {})
 
-    current_extra = st.get('extra_bonus', '') or ''
-    prev_extra    = prev_extra_bonus_map.get(node['id'], '')
-    current_rank  = EXTRA_BONUS_RANK.get(current_extra, 0)
-    prev_rank     = EXTRA_BONUS_RANK.get(prev_extra, 0)
+        current_extra = st.get('extra_bonus', '') or ''
+        prev_extra    = prev_extra_bonus_map.get(node['id'], '')
+        current_rank  = EXTRA_BONUS_RANK.get(current_extra, 0)
+        prev_rank     = EXTRA_BONUS_RANK.get(prev_extra, 0)
 
-    # ── ОТЛАДКА — удалить после проверки ──
-    logger.warning(
-        f"USER {node['id']} | "
-        f"current_extra='{current_extra}' (rank={current_rank}) | "
-        f"prev_extra='{prev_extra}' (rank={prev_rank}) | "
-        f"show={current_rank > prev_rank}"
-    )
-    # ──────────────────────────────────────
+        # ── ОТЛАДКА — удалить после проверки ──
+        logger.warning(
+            f"USER {node['id']} | "
+            f"current_extra='{current_extra}' (rank={current_rank}) | "
+            f"prev_extra='{prev_extra}' (rank={prev_rank}) | "
+            f"show={current_rank > prev_rank}"
+        )
+        # ──────────────────────────────────────
 
-    node['extra_bonus'] = current_extra if current_rank > prev_rank else ''
+        node['extra_bonus'] = current_extra if current_rank > prev_rank else ''
     for node in nodes:
         
         st = status_map.get(node['id'], {})
