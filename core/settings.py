@@ -166,7 +166,8 @@ CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 минут
 CELERY_RESULT_EXPIRES = 60 * 60 * 24  # Результаты хранятся 24 часа
 
 # Email настройки (теперь в продакшен конфиге)
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_BACKEND = 'django.core.mail.backends.dummy.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'  # или ваш SMTP сервер
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
@@ -198,5 +199,6 @@ CACHES = {
 FASTAPI_SERVICE_URL = os.environ.get('FASTAPI_URL', "http://45.130.148.146:8001")
 
 CELERY_TASK_MAX_RETRIES = 3
+CELERY_TASK_ALWAYS_EAGER = True
 
 FASTAPI_BASE_URL="http://45.130.148.146:8001"

@@ -22,6 +22,51 @@ from .tasks import send_verification_email_task, send_welcome_email_task, send_r
 
 logger = logging.getLogger(__name__)
 
+
+# def referral_register_view(request, referral_link):
+#     """Регистрация по реферальной ссылке"""
+#     try:
+#         referrer = CustomUser.objects.get(referral_link=referral_link)
+#     except CustomUser.DoesNotExist:
+#         messages.error(request, 'Неверная реферальная ссылка')
+#         return redirect('accounts:login')
+#
+#     if request.method == 'POST':
+#         form = ReferralRegistrationForm(request.POST)
+#         if form.is_valid():
+#             try:
+#                 user = form.save(referrer=referrer)
+#
+#                 # Генерация кода подтверждения
+#                 verification_code = user.generate_email_verification_code()
+#
+#                 # Отправка email через Celery (асинхронно)
+#                 send_verification_email_task.delay(
+#                     email=user.email,
+#                     code=verification_code,
+#                     username=user.get_full_name()
+#                 )
+#
+#                 # Сохраняем user_id в сессии для подтверждения email
+#                 request.session['user_for_verification'] = user.user_id
+#                 request.session['email_for_verification'] = user.email
+#
+#                 messages.success(request,
+#                                  f'Регистрация успешна! На почту {user.email} отправлен код подтверждения.')
+#                 return redirect('accounts:verify_email')
+#
+#             except Exception as e:
+#                 messages.error(request, f'Ошибка при регистрации: {str(e)}')
+#     else:
+#         form = ReferralRegistrationForm()
+#
+#     context = {
+#         'form': form,
+#         'referrer': referrer,
+#         'referral_link': referral_link
+#     }
+#     return render(request, 'accounts/referral_register.html', context)
+
 def referral_register_view(request, referral_link):
     """Регистрация по реферальной ссылке"""
     try:
@@ -36,23 +81,25 @@ def referral_register_view(request, referral_link):
             try:
                 user = form.save(referrer=referrer)
 
-                # Генерация кода подтверждения
-                verification_code = user.generate_email_verification_code()
+                # Сразу подтверждаем email без отправки кода
+                user.is_email_verified = True
+                user.save()
 
-                # Отправка email через Celery (асинхронно)
-                send_verification_email_task.delay(
-                    email=user.email,
-                    code=verification_code,
-                    username=user.get_full_name()
+                # Регистрируем в FastAPI
+                service = FastAPIService()
+                referrer_id = user.referrer.username if user.referrer else None
+                service.add_user(user_id=user.username, referrer_id=referrer_id)
+                logger.info(f"FastAPI add new user {user.username} with referrer {referrer_id}")
+
+                # Автологин
+                login(request, user)
+
+                messages.success(
+                    request,
+                    f'Регистрация успешна! Добро пожаловать, {user.get_full_name()}! '
+                    f'Ваш ID для входа: {user.user_id}'
                 )
-
-                # Сохраняем user_id в сессии для подтверждения email
-                request.session['user_for_verification'] = user.user_id
-                request.session['email_for_verification'] = user.email
-
-                messages.success(request,
-                                 f'Регистрация успешна! На почту {user.email} отправлен код подтверждения.')
-                return redirect('accounts:verify_email')
+                return redirect('cabinet:dashboard')
 
             except Exception as e:
                 messages.error(request, f'Ошибка при регистрации: {str(e)}')
@@ -222,6 +269,7 @@ def login_view(request):
 
     return render(request, 'accounts/login.html')
 
+
 @login_required
 def logout_view(request):
     logout(request)
@@ -275,6 +323,7 @@ def send_verification_email(to_email, code, username):
     except Exception as e:
         print(f"Ошибка отправки email: {e}")
         return False
+
 
 def registration_info_view(request):
     """Страница с информацией о регистрации"""
